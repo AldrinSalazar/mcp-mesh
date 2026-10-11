@@ -6,7 +6,18 @@ the hub over one outgoing connection: the machine opens no ports.
 
 ## Install
 
-Download the archive for the machine from the
+On macOS or Linux (Intel or ARM 64-bit), install it with
+[Homebrew](https://brew.sh):
+
+```sh
+brew install aldrinsalazar/tap/mcp-mesh-node
+```
+
+To upgrade, run `brew upgrade mcp-mesh-node`. A running node keeps the old
+version until it restarts: run `mcp-mesh-node stop && mcp-mesh-node start`
+(also if it runs as a [service](#start-at-login-or-at-boot)).
+
+Otherwise, download the archive for the machine from the
 [latest release](https://github.com/AldrinSalazar/mcp-mesh/releases/latest)
 and put `mcp-mesh-node` on your `PATH`:
 
@@ -92,7 +103,9 @@ new hub key (`key set`) is applied at once.
 your login `PATH` so commands such as `npx` are found. On a Linux machine
 nobody logs in to (a server), use `install --at-boot` so it starts when the
 machine boots. `uninstall` turns it off and stops the node, keeping the
-config.
+config. A node installed with Homebrew runs from
+`$(brew --prefix)/opt/mcp-mesh-node`, so the service keeps working after
+`brew upgrade`.
 
 ## node.yaml
 

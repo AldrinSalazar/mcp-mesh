@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,7 +35,7 @@ type Options struct {
 	SocketPath string
 	Version    string
 	// Executable is the mcp-mesh-node binary that Start and Install run;
-	// empty means os.Executable with symlinks resolved.
+	// empty means os.Executable with symlinks resolved (see homebrewOpt).
 	Executable string
 	// StateDir holds LogFile and the captured login environment; empty means
 	// paths.StateDir().
@@ -93,6 +94,31 @@ type Node struct {
 	services chan struct{}
 }
 
+// homebrewOpt turns a binary inside a Homebrew keg
+// (<prefix>/Cellar/<formula>/<version>/...) into the same file through
+// <prefix>/opt/<formula>, which follows upgrades. brew upgrade removes the old
+// keg, so a service that ran from it would no longer start. Other paths are
+// returned unchanged.
+func homebrewOpt(path string) string {
+	prefix, keg, ok := strings.Cut(path, "/Cellar/")
+	if !ok {
+		return path
+	}
+	formula, rest, ok := strings.Cut(keg, "/")
+	if !ok {
+		return path
+	}
+	_, file, ok := strings.Cut(rest, "/") // drop the version
+	if !ok {
+		return path
+	}
+	opt := filepath.Join(prefix, "opt", formula, file)
+	if target, err := filepath.EvalSymlinks(opt); err != nil || target != path {
+		return path
+	}
+	return opt
+}
+
 func New(opts Options) (*Node, error) {
 	var err error
 	if opts.Executable == "" {
@@ -104,6 +130,7 @@ func New(opts Options) (*Node, error) {
 		if err != nil {
 			return nil, fmt.Errorf("resolve executable: %w", err)
 		}
+		opts.Executable = homebrewOpt(opts.Executable)
 	}
 	if opts.StateDir == "" {
 		opts.StateDir, err = paths.StateDir()
