@@ -1,0 +1,121 @@
+# mcp-mesh-node for every platform. Every push builds them as workflow
+# artifacts; a v* tag also publishes them, with checksums and the changes
+# since the last release, as a GitHub release (a pre-release for tags such
+# as v1.2.0-rc.1). Asset names carry no version, so
+# releases/latest/download/<asset> always points at the newest one.
+name: Node binaries
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux_amd64, goos: linux, goarch: amd64 }
+          - { target: linux_386, goos: linux, goarch: '386' }
+          - { target: linux_arm64, goos: linux, goarch: arm64 }
+          - { target: linux_armv7, goos: linux, goarch: arm, goarm: '7' }
+          - { target: darwin_amd64, goos: darwin, goarch: amd64 }
+          - { target: darwin_arm64, goos: darwin, goarch: arm64 }
+          - { target: windows_amd64, goos: windows, goarch: amd64 }
+          - { target: windows_386, goos: windows, goarch: '386' }
+          - { target: windows_arm64, goos: windows, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the version comes from git describe
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: make node
+      - name: Package
+        env:
+          NAME: mcp-mesh-node_${{ matrix.target }}
+          GOOS: ${{ matrix.goos }}
+        run: |
+          mkdir -p "pkg/$NAME" dist
+          cp bin/mcp-mesh-node* LICENSE README.md "pkg/$NAME/"
+          cd pkg
+          if [ "$GOOS" = windows ]; then
+            zip -qr "../dist/$NAME.zip" "$NAME"
+          else
+            tar -czf "../dist/$NAME.tar.gz" "$NAME"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mcp-mesh-node_${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          cat > notes.md <<EOF
+          ## Hub
+
+          The hub ships as a container image for linux/amd64, linux/arm64 and linux/arm/v7:
+
+          \`\`\`sh
+          docker pull ghcr.io/$owner/mcp-mesh-hub:${TAG#v}
+          \`\`\`
+
+          See [Hub setup](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/hub.md).
+
+          ## Node
+
+          Download the archive for your machine below; \`SHA256SUMS\` has their checksums. See [Node configuration](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/node.md#install).
+
+          | | x86-64 | x86 (32-bit) | ARM 64-bit | ARM 32-bit |
+          | --- | --- | --- | --- | --- |
+          | Linux | \`linux_amd64\` | \`linux_386\` | \`linux_arm64\` | \`linux_armv7\` |
+          | macOS | \`darwin_amd64\` | | \`darwin_arm64\` (Apple silicon) | |
+          | Windows (preview) | \`windows_amd64\` | \`windows_386\` | \`windows_arm64\` | |
+
+          On Windows only \`mcp-mesh-node wrap\` works for now (in the foreground); the background node and the service come later.
+          EOF
+          # v1.2.0-rc.1 and the like are pre-releases: they must not become
+          # Latest, which releases/latest/download links follow.
+          flags=()
+          if [[ $TAG == *-* ]]; then
+            flags+=(--prerelease --latest=false)
+          fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            # --notes goes before the generated changes since the last release.
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "mcp-mesh ${TAG#v}" --notes "$(cat notes.md)" --generate-notes "${flags[@]}"
+          fi

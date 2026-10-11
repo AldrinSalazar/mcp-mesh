@@ -1,0 +1,25 @@
+# The hub requires keys. On first start it creates the admin user "admin"
+# and logs its generated password once (docker compose logs hub), unless
+# MCPMESH_ADMIN_PASSWORD is set; create node and client keys in the
+# dashboard or with
+#   docker compose exec hub /mcp-mesh-hub key create node <name>
+# Plain HTTP is only accepted from private addresses. Docker's port proxy can
+# make every client look private, so put TLS in front (or set
+# MCPMESH_TLS_CERT/KEY) before exposing the hub beyond your LAN.
+services:
+  hub:
+    # mDNS does not cross Docker's bridge network. For discovery on Linux, use
+    # network_mode: host (instead of ports below), or give nodes the hub URL.
+    image: ghcr.io/aldrinsalazar/mcp-mesh-hub:1
+    restart: unless-stopped
+    environment:
+      # Host name nodes and clients use to reach the hub; shown in the admin UI snippets.
+      MCPMESH_PUBLIC_HOST: localhost # e.g. hub.home.lan or the machine's address
+    volumes:
+      - hub-data:/data # hub.db (keys, admin users, groups, audit log); keep it across restarts
+    ports:
+      - "127.0.0.1:7000:7000" # admin UI, local only
+      - "7001:7001"           # nodes
+      - "7002:7002"           # MCP clients
+volumes:
+  hub-data:

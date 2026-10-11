@@ -1,0 +1,8 @@
+.cache
+.git
+bin
+dist
+e2e-results
+web/node_modules
+web/test-results
+web/playwright-report

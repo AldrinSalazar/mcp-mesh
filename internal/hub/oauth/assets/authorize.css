@@ -1,0 +1,130 @@
+/* Colours and fonts follow web/src/styles/tokens.css. The page can't load
+   the dashboard's fonts from another port, so it serves Latin subsets of
+   them itself (assets/fonts, from the @fontsource packages). */
+@font-face { font-family: 'Space Grotesk'; font-weight: 500; font-display: swap; src: url(fonts/space-grotesk-latin-500-normal.woff2) format('woff2'); }
+@font-face { font-family: 'Inter Tight'; font-weight: 400; font-display: swap; src: url(fonts/inter-tight-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: 'Inter Tight'; font-weight: 600; font-display: swap; src: url(fonts/inter-tight-latin-600-normal.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format('woff2'); }
+:root {
+  --paper: #f3f1ea;
+  --surface: #fbfaf6;
+  --ink: #252922;
+  --muted: #73776d;
+  --rule: #d9dcd2;
+  --cobalt: #3555e8;
+  --cobalt-soft: #e8ecff;
+  --on-cobalt: #ffffff;
+  --err: #aa4738;
+  --err-soft: #f8e9e3;
+  --warn: #91671f;
+  --warn-soft: #f5edda;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1e211e;
+    --surface: #272b26;
+    --ink: #f2f2e9;
+    --muted: #a2ab9d;
+    --rule: #41473e;
+    --cobalt: #8495ff;
+    --cobalt-soft: #333d64;
+    --err: #e6a094;
+    --err-soft: #49312b;
+    --warn: #e8c47e;
+    --warn-soft: #443d2b;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.5 "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 32px;
+}
+.crumb {
+  margin: 0 0 20px;
+  font: 11px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 { margin: 0 0 12px; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 26px; line-height: 1.25; font-weight: 500; }
+p { margin: 0 0 16px; }
+.muted { color: var(--muted); font-size: 13px; }
+.dest {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  background: var(--cobalt-soft);
+  border-radius: 3px;
+  font-size: 13px;
+}
+.dest strong {
+  display: block;
+  font: 400 15px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+label { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 500; }
+input[type=text], input[type=password] {
+  width: 100%;
+  height: 42px;
+  margin: 0 0 16px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font: inherit;
+}
+input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+fieldset { margin: 0 0 16px; padding: 0; border: 0; }
+legend { padding: 0; margin: 0 0 6px; font-size: 13px; font-weight: 500; }
+.group {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-weight: 400;
+}
+.group input { margin-top: 4px; }
+.group small { display: block; color: var(--muted); }
+.actions { display: flex; gap: 12px; margin-top: 8px; }
+button {
+  flex: 1;
+  height: 42px;
+  border-radius: 3px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.primary { background: #3555e8; border-color: #3555e8; color: var(--on-cobalt); }
+.notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: var(--err-soft);
+  color: var(--err);
+  font-size: 13px;
+}
+.notice.warn { background: var(--warn-soft); color: var(--warn); }
+a { color: var(--cobalt); }
+
+input[type="checkbox"] { accent-color: var(--cobalt); }

@@ -1,0 +1,68 @@
+/* Design tokens from the Penpot file "MCP Mesh — Control Room" (Design
+   system board). Light is the default; [data-theme=dark] swaps the palette. */
+:root {
+  /* 01 / Color */
+  --paper: #f3f1ea;       /* page background, table heads, code wells */
+  --surface: #fbfaf6;     /* cards, sidebar, top bar, inputs */
+  --ink: #252922;         /* text, active nav, dark wells */
+  --muted: #73776d;       /* secondary text, icons */
+  --rule: #d9dcd2;        /* borders, dividers, idle badges */
+  --cobalt: #3555e8;      /* actions, links, selection */
+  --cobalt-fill: #3555e8; /* primary button background */
+  --cobalt-soft: #e8ecff; /* selected rows and options, client badge */
+  --on-cobalt: #ffffff;
+
+  /* status: always paired with a word */
+  --ok: #376d53;
+  --ok-soft: #e7efe6;
+  --warn: #91671f;
+  --warn-soft: #f5edda;
+  --err: #aa4738;
+  --err-soft: #f8e9e3;
+  --danger-fill: #aa4738;
+
+  --scrim: rgba(37, 41, 34, 0.38);
+  --skeleton: #d9dcd2;
+  --skeleton-soft: #f3f1ea;
+
+  /* 02 / Type */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter Tight', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* 03 / Controls & layout */
+  --control-h: 42px;
+  --badge-h: 26px;
+  --radius: 3px;
+  --sidebar-w: 224px;
+  --topbar-h: 72px;
+  --inset: 40px;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --paper: #1e211e;
+  --surface: #272b26;
+  --ink: #f2f2e9;
+  --muted: #a2ab9d;
+  --rule: #41473e;
+  --cobalt: #8495ff;
+  --cobalt-fill: #3555e8;
+  --cobalt-soft: #333d64;
+  --on-cobalt: #ffffff;
+
+  --ok: #9acea9;
+  --ok-soft: #303f33;
+  --warn: #e8c47e;
+  --warn-soft: #443d2b;
+  --err: #e6a094;
+  --err-soft: #49312b;
+  --danger-fill: #aa4738;
+
+  --scrim: rgba(10, 12, 10, 0.6);
+  --skeleton: #41473e;
+  --skeleton-soft: #303530;
+
+  color-scheme: dark;
+}

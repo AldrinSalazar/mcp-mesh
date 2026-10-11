@@ -1,0 +1,64 @@
+{{define "page"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{if .ContinueURL}}<meta http-equiv="refresh" content="0;url={{.ContinueURL}}">
+{{end}}<title>{{.Title}} - {{.HubName}}</title>
+<link rel="stylesheet" href="{{.CSSPath}}">
+</head>
+<body>
+<main class="card">
+<p class="crumb">{{.HubName}} / Authorize</p>
+{{if eq .Mode "bounce"}}
+<h1>Continuing</h1>
+<p class="muted">One moment while the request is opened on this site.</p>
+<p><a href="{{.ContinueURL}}">Continue</a></p>
+{{else if eq .Mode "error"}}
+<h1>Can't continue</h1>
+<div class="notice">{{.Error}}</div>
+<p class="muted">Nothing was authorized. You can close this page and start again from the app.</p>
+{{else}}
+<h1>{{.ClientName}} wants to use the tools on {{.HubName}}</h1>
+<div class="dest">After you decide, you are sent to<strong>{{.RedirectLabel}}</strong>{{if .ClientURI}}<span class="muted">App website: {{.ClientURI}}</span>{{end}}</div>
+{{if .Error}}<div class="notice{{if .Warn}} warn{{end}}" role="alert">{{.Error}}</div>{{end}}
+{{if eq .Mode "signin"}}
+<p class="muted">Sign in as a hub admin to review this request.</p>
+<form method="post" action="{{.Action}}">
+{{range .Fields}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">
+{{end}}<input type="hidden" name="action" value="signin">
+<label for="username">Username</label>
+<input type="text" id="username" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" required>
+<label for="password">Password</label>
+<input type="password" id="password" name="password" autocomplete="current-password" required>
+<div class="actions"><button type="submit" class="primary">Sign in</button></div>
+</form>
+{{else}}
+<form method="post" action="{{.Action}}">
+{{range .Fields}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">
+{{end}}<input type="hidden" name="csrf" value="{{.CSRF}}">
+{{if .Existing}}<fieldset>
+<legend>Key</legend>
+<p class="muted">{{.ClientName}} already has access. Keep using its key, or give it a new one.</p>
+{{range .Existing}}<label class="group"><input type="radio" name="key" value="{{.ID}}"{{if .Checked}} checked{{end}}><span>{{.Name}}<small>{{.Used}}; keeps its groups</small></span></label>
+{{end}}<label class="group"><input type="radio" name="key" value="new"><span>A new key<small>with the name and groups below</small></span></label>
+</fieldset>
+{{end}}<fieldset>
+<legend>{{if .Existing}}Tools a new key can use{{else}}Tools it can use{{end}}</legend>
+{{range .Groups}}<label class="group"><input type="checkbox" name="group" value="{{.ID}}"{{if .Checked}} checked{{end}}><span>{{.Name}}{{if .Description}}<small>{{.Description}}</small>{{end}}</span></label>
+{{else}}<p class="muted">There are no groups, so it will see no tools until you add it to one.</p>
+{{end}}</fieldset>
+<label for="key_name">Key name</label>
+<input type="text" id="key_name" name="key_name" value="{{.KeyName}}" maxlength="64" autocomplete="off">
+<p class="muted">Signed in as {{.Username}}. You can revoke this access any time by deleting the key.</p>
+<div class="actions">
+<button type="submit" name="action" value="deny">Deny</button>
+<button type="submit" name="action" value="allow" class="primary">Allow</button>
+</div>
+</form>
+{{end}}
+{{end}}
+</main>
+</body>
+</html>
+{{end}}
