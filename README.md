@@ -13,6 +13,10 @@ mcp-mesh brings the MCP servers on your machines into one place. Connect an
 AI agent to your hub and let it use tools from your desktop, laptop, or home
 server.
 
+<p align="center">
+  <img src="docs/images/how-it-works.png" alt="An AI client connects to the mcp-mesh hub with a client key; nodes on the workstation, mac-mini and laptop connect to the hub with node keys" width="896">
+</p>
+
 Run the hub once. Add a node on each machine. Keep your tools where they are.
 
 [Quick start](#quick-start) · [Built for teams](#built-for-teams) · [How it works](#how-it-works) · [Documentation](#documentation) · [Commercial use](#commercial-use)
@@ -75,12 +79,10 @@ Using mcp-mesh at work needs a commercial license; see
 ## How it works
 
 An MCP server normally exposes tools on one machine. mcp-mesh makes those
-tools available through a hub, so an agent can reach them from another
-device.
-
-<p align="center">
-  <img src="docs/images/how-it-works.png" alt="An AI client connects to the mcp-mesh hub with a client key; nodes on the workstation, mac-mini and laptop connect to the hub with node keys" width="896">
-</p>
+tools available through a hub, as in the diagram at the top, so an agent can
+reach them from another device. Every connection points toward the hub, and
+the hub speaks MCP on both sides: one MCP server to each agent, one MCP
+client to each MCP server on each node.
 
 Tools are named for their machine and MCP, so agents know where an action
 runs:
