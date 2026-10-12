@@ -96,6 +96,9 @@ type Conn struct {
 	// afterChunk, if set by a test, runs after each chunk write once the
 	// write turn has been released.
 	afterChunk func(id uint32, sent int)
+	// beforeWrite, if set (tests), runs when a sender has its turn, just
+	// before its frame goes out.
+	beforeWrite func()
 }
 
 type stream struct {
@@ -232,7 +235,16 @@ func (c *Conn) writeTurn(ctx context.Context, typ websocket.MessageType, b []byt
 		return err
 	}
 	defer c.turns.release()
-	return c.ws.Write(ctx, typ, b)
+	if c.beforeWrite != nil {
+		c.beforeWrite()
+	}
+	// Once its turn comes a frame is written whole: the websocket library
+	// closes the connection when a write's context ends mid-frame, and this
+	// connection carries every channel of a node, so a call or channel ending
+	// would cut off all the others. The context only bounds the wait for a
+	// turn; a long message is chunked, so it stops between chunks, and a
+	// peer that stops reading is caught by the heartbeat.
+	return c.ws.Write(context.WithoutCancel(ctx), typ, b)
 }
 
 // Send writes one envelope. Over a v2 connection an envelope larger than
