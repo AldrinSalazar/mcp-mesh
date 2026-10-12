@@ -155,9 +155,13 @@ if hubctl key list | grep -q "mm_"; then fail "key list hides secrets" "found a 
 export MCPMESH_CLIENT_KEY=$client_key
 
 echo "hub, node and MCPs"
-MCPMESH_ADMIN_PASSWORD=$admin_password "$sbx/bin/mcp-mesh-hub" --data-dir "$sbx/hub-data" --admin-listen 127.0.0.1:7100 --node-listen 127.0.0.1:7101 \
-	--client-listen 127.0.0.1:7102 --mdns=false >"$sbx/hub.log" 2>&1 &
-pids+=($!)
+start_hub() {
+	MCPMESH_ADMIN_PASSWORD=$admin_password "$sbx/bin/mcp-mesh-hub" --data-dir "$sbx/hub-data" --admin-listen 127.0.0.1:7100 --node-listen 127.0.0.1:7101 \
+		--client-listen 127.0.0.1:7102 --mdns=false >>"$sbx/hub.log" 2>&1 &
+	hub_pid=$!
+	pids+=("$hub_pid")
+}
+start_hub
 start_app
 eventually_ok 10 "hub answers /healthz" "ok" curl -fsS http://127.0.0.1:7100/healthz
 expect_ok "hub serves the dashboard app" '<div id="app">' curl -fsS http://127.0.0.1:7100/
@@ -465,6 +469,17 @@ run "start it again with its saved key" pairnode start
 eventually_ok 20 "it reconnects without pairing again" "isError=false\): rendered again" call livetest-paired__cli__render '{"scene":"again"}'
 expect_ok "no request waits after that" '^\[\]$' api GET /pairings
 run "stop the paired node" pairnode stop
+
+echo "the hub remembers machines"
+kill "$hub_pid"
+wait "$hub_pid" 2>/dev/null || true
+start_hub
+eventually_ok 10 "hub answers /healthz after a restart" "ok" curl -fsS http://127.0.0.1:7100/healthz
+api_login || fail "API sign-in after the restart" "no CSRF token"
+expect_ok "a restarted hub still lists its offline machines" '"name":"livetest-paired"[^]]*"online":false' api GET /nodes
+expect_ok "an offline machine can be forgotten" '^204' api DELETE /nodes/livetest-paired
+if api GET /nodes | grep -q '"name":"livetest-paired"'; then fail "a forgotten machine isn't listed" "still listed"; else pass "a forgotten machine isn't listed"; fi
+expect_ok "forgetting is in the admin log" '"action":"node.forget"' api GET /admin-log
 
 if grep -Eq 'panic|DATA RACE' "$sbx/hub.log" "$sbx/state/mcp-mesh/node.log" "$sbx/pair/state/mcp-mesh/node.log" 2>/dev/null; then
 	fail "no panics in logs" "$(grep -Eh 'panic|DATA RACE' "$sbx/hub.log" "$sbx/state/mcp-mesh/node.log" "$sbx/pair/state/mcp-mesh/node.log" 2>/dev/null | head -3)"

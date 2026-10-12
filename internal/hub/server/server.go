@@ -35,6 +35,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/dashboard"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/gateway"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/identity"
+	"github.com/AldrinSalazar/mcp-mesh/internal/hub/known"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/oauth"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/overrides"
@@ -361,6 +362,11 @@ func Run(ctx context.Context, cfg Config) error {
 	registry := nodes.NewRegistry(registryOpts)
 	gw = gateway.New(gatewayOpts)
 	apiOpts.Nodes = registry
+	knownNodes, err := known.Open(ctx, db.DB, log.With("component", "known"))
+	if err != nil {
+		return err
+	}
+	apiOpts.Known, apiOpts.StartedAt = knownNodes, time.Now()
 	var pairings *pairing.Manager
 	if cfg.Auth && cfg.Pairing {
 		pairings = pairing.New(pairing.Options{Logger: log.With("component", "pairing"), ClientIP: auth.ClientIP})
@@ -423,6 +429,7 @@ func Run(ctx context.Context, cfg Config) error {
 	g.Go(func() error { audit.Run(auditCtx); return nil })
 	g.Go(func() error { apiServer.Run(ctx); return nil })
 	g.Go(func() error { tr.Run(ctx); return nil })
+	g.Go(func() error { knownNodes.Run(ctx, registry.Nodes, 2*time.Second); return nil })
 	g.Go(func() error { toolOverrides.Watch(ctx, time.Second); return nil })
 	if groups != nil {
 		g.Go(func() error { groups.Watch(ctx, time.Second); return nil })

@@ -23,6 +23,7 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 		"client_url":     s.opts.ClientURL,
 		"discovery_name": s.opts.DiscoveryName,
 		"oauth":          s.opts.OAuthIssuer != "",
+		"started_at":     s.opts.StartedAt,
 	})
 }
 
@@ -94,6 +95,35 @@ func (s *Server) sessionLogout(w http.ResponseWriter, r *http.Request) {
 // --- read-only views ---
 
 func (s *Server) nodesList(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.nodeViews()) }
+
+// nodeForget removes an offline node from the list. A connected node can't
+// be forgotten: it would be listed again at once.
+func (s *Server) nodeForget(w http.ResponseWriter, r *http.Request) {
+	name := state(r).params["name"]
+	if s.opts.Known == nil {
+		writeError(w, http.StatusNotFound, "the hub doesn't remember nodes")
+		return
+	}
+	if s.opts.Nodes != nil {
+		for _, n := range s.opts.Nodes.Nodes() {
+			if n.Name == name && n.Online {
+				writeError(w, http.StatusConflict, name+" is connected; only an offline node can be forgotten")
+				return
+			}
+		}
+	}
+	forgot, err := s.opts.Known.Forget(r.Context(), name)
+	if err != nil {
+		s.internal(w, "forget node", err)
+		return
+	}
+	if !forgot {
+		writeError(w, http.StatusNotFound, "no such node")
+		return
+	}
+	s.record(r, adminlog.NodeForget, name, "")
+	w.WriteHeader(http.StatusNoContent)
+}
 func (s *Server) toolsList(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.toolViews()) }
 func (s *Server) callsList(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.callViews()) }
 

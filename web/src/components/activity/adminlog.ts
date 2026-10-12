@@ -17,6 +17,7 @@ const actions: Record<string, string> = {
   'group.delete': 'Deleted a group',
   'trust.level': 'Changed a trust level',
   'node.approve': 'Approved a node',
+  'node.forget': 'Forgot a node',
   'tool.approve': 'Approved tools',
   'oauth.authorize': 'Authorized an app',
   'oauth.denied': 'Denied an app',

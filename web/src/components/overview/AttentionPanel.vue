@@ -25,10 +25,10 @@ withDefaults(defineProps<{ items: Problem[]; now: number; approvals?: ApprovalIt
         </RouterLink>
       </li>
       <li v-for="p in items" :key="`${p.node}/${p.mcp ?? ''}`">
-        <RouterLink class="item" :to="{ path: '/nodes', query: { node: p.node } }">
+        <RouterLink class="item" :to="p.node ? { path: '/nodes', query: { node: p.node } } : '/nodes'">
           <StatusDot :tone="p.tone" :size="8" class="dot" />
           <span class="title truncate" :title="p.title">{{ p.title }}</span>
-          <span v-if="p.kind === 'node'" class="detail small muted">{{ p.since ? `Last seen ${agoLong(p.since, now)}` : 'Offline' }}</span>
+          <span v-if="p.kind === 'node'" class="detail small muted truncate" :title="p.detail">{{ [p.detail, p.since ? `Last seen ${agoLong(p.since, now)}` : 'Offline'].filter(Boolean).join(' · ') }}</span>
           <span v-else class="detail mono muted truncate" :title="p.detail">{{ p.detail }}</span>
         </RouterLink>
       </li>

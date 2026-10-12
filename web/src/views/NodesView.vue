@@ -11,6 +11,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import NodeCard from '@/components/nodes/NodeCard.vue'
 import RevokeNodeKeyDialog from '@/components/nodes/RevokeNodeKeyDialog.vue'
+import ForgetNodeDialog from '@/components/nodes/ForgetNodeDialog.vue'
 import { filterNodes, type StateFilter } from '@/components/nodes/filter'
 import { live, useNow } from '@/lib/live'
 import { openCreateKey } from '@/lib/dialogs'
@@ -23,6 +24,7 @@ const query = ref('')
 const state = ref<StateFilter>('')
 const open = reactive(new Set<string>())
 const revoking = ref<{ node: string; keyId: string } | null>(null)
+const forgetting = ref<string | null>(null)
 
 const stateOptions = [
   { value: '', label: 'All states' },
@@ -105,11 +107,13 @@ watch(
         :now="now"
         @toggle="toggle(n.name)"
         @revoke="revoking = { node: n.name, keyId: n.key_id }"
+        @forget="forgetting = n.name"
       />
     </div>
   </template>
 
   <RevokeNodeKeyDialog v-if="revoking" :node="revoking.node" :key-id="revoking.keyId" @close="revoking = null" />
+  <ForgetNodeDialog v-if="forgetting" :node="forgetting" @close="forgetting = null" />
 </template>
 
 <style scoped>

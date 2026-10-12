@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/activity"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/auth"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/catalog"
+	"github.com/AldrinSalazar/mcp-mesh/internal/hub/known"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 	"github.com/AldrinSalazar/mcp-mesh/internal/proto"
 )
@@ -1173,5 +1175,78 @@ func TestReadinessNeedsAFirstSnapshot(t *testing.T) {
 	h := e.srv.Health(t.Context())
 	if h.Ready || len(h.Problems) != 1 || !strings.Contains(h.Problems[0], "no complete snapshot") {
 		t.Fatalf("health = %+v", h)
+	}
+}
+
+type fakeKnown struct {
+	mu    sync.Mutex
+	nodes []known.Node
+}
+
+func (f *fakeKnown) List() []known.Node {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.nodes)
+}
+
+func (f *fakeKnown) Forget(_ context.Context, name string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	i := slices.IndexFunc(f.nodes, func(n known.Node) bool { return n.Name == name })
+	if i < 0 {
+		return false, nil
+	}
+	f.nodes = slices.Delete(f.nodes, i, i+1)
+	return true, nil
+}
+
+func TestKnownNodesListedOffline(t *testing.T) {
+	e := newEnv(t, true)
+	lastSeen := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	k := &fakeKnown{nodes: []known.Node{
+		{Name: "laptop", LastSeen: lastSeen}, // connected: the registry's view wins
+		{Name: "studio", OS: "darwin", KeyID: "k_9", LastSeen: lastSeen, MCPs: []known.MCP{{Name: "fusion", Transport: "http", Start: "lazy", Tools: 4}}},
+	}}
+	e.srv.opts.Known = k
+	var list []nodeView
+	decodeBody(t, e.do("GET", "/api/v1/nodes", ""), &list)
+	var names []string
+	for _, n := range list {
+		names = append(names, n.Name)
+	}
+	if !slices.Equal(names, []string{"laptop", "old", "studio"}) {
+		t.Fatalf("nodes = %v", names)
+	}
+	if !list[0].Online || list[0].MCPs[0].State != "ready" {
+		t.Fatalf("laptop = %+v", list[0])
+	}
+	studio := list[2]
+	if studio.Online || studio.DisconnectedAt == nil || !studio.DisconnectedAt.Equal(lastSeen) || studio.OS != "darwin" || studio.KeyID != "k_9" {
+		t.Fatalf("studio = %+v", studio)
+	}
+	if len(studio.MCPs) != 1 || studio.MCPs[0].State != "closed" || studio.MCPs[0].Tools != 4 || studio.MCPs[0].Problems == nil {
+		t.Fatalf("studio mcps = %+v", studio.MCPs)
+	}
+
+	// Forget: only offline nodes, and only known ones.
+	wantStatus(t, e.do("DELETE", "/api/v1/nodes/laptop", ""), http.StatusConflict)
+	wantStatus(t, e.do("DELETE", "/api/v1/nodes/nobody", ""), http.StatusNotFound)
+	wantStatus(t, e.do("DELETE", "/api/v1/nodes/studio", ""), http.StatusNoContent)
+	decodeBody(t, e.do("GET", "/api/v1/nodes", ""), &list)
+	if len(list) != 2 {
+		t.Fatalf("after forget: %+v", list)
+	}
+	wantStatus(t, e.do("DELETE", "/api/v1/nodes/studio", "", noCSRF), http.StatusForbidden)
+}
+
+func TestInfoHasStartTime(t *testing.T) {
+	e := newEnv(t, false)
+	e.srv.opts.StartedAt = time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	var info struct {
+		StartedAt time.Time `json:"started_at"`
+	}
+	decodeBody(t, e.do("GET", "/api/v1/info", "", anon), &info)
+	if !info.StartedAt.Equal(e.srv.opts.StartedAt) {
+		t.Fatalf("started_at = %v", info.StartedAt)
 	}
 }
