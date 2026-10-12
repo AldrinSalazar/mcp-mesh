@@ -195,6 +195,26 @@ func ClearKey(path string) error {
 	return nil
 }
 
+// SetHubURL sets hub.url, keeping comments.
+func SetHubURL(path, hubURL string) error {
+	err := editConfig(path, func(root *yaml.Node) error {
+		hub, err := hubMapping(root)
+		if err != nil {
+			return err
+		}
+		if i := mappingIndex(hub, "url"); i >= 0 {
+			hub.Content[i+1] = stringNode(hubURL)
+		} else {
+			hub.Content = append([]*yaml.Node{stringNode("url"), stringNode(hubURL)}, hub.Content...)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("set hub.url in %s: %w", path, err)
+	}
+	return nil
+}
+
 func hubMapping(root *yaml.Node) (*yaml.Node, error) {
 	i := mappingIndex(root, "hub")
 	if i < 0 || root.Content[i+1].Kind != yaml.MappingNode {

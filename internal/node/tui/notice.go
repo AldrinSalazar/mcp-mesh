@@ -16,6 +16,8 @@ func (m *model) noticeLine() string {
 		return "Stop starting at login? y/n"
 	case "remove":
 		return "Remove " + singleLine(m.confirmName) + "? y/n"
+	case "pair":
+		return "Pair again? y/n"
 	}
 	if m.busy {
 		return m.accent(m.indicator.View()) + " " + singleLine(m.notice)
@@ -72,6 +74,8 @@ func (m *model) confirmLines() []string {
 		return []string{m.bold("Start the node at login? y/n"), m.dim("Installs a user service (systemd/launchd) that starts the node at login and restarts it if it crashes. It captures your login shell's PATH so MCP commands are found."), m.dim("If the node is running now, it moves under the service.")}
 	case "uninstall":
 		return []string{m.red(m.bold("Stop starting at login? y/n")), m.dim("Removes the user service and stops the node. Your config is kept; s still starts it by hand.")}
+	case "pair":
+		return []string{m.red(m.bold("Pair this machine again? y/n")), m.dim("It already has a hub key. Pairing again removes it, and the node asks the hub for a new one, which an admin approves in the hub's dashboard.")}
 	default:
 		return []string{m.red(m.bold("Remove " + singleLine(m.confirmName) + "? y/n")), m.dim("Remove this MCP from the config (press R afterwards to apply).")}
 	}

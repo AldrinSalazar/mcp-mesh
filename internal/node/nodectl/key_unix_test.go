@@ -152,3 +152,52 @@ func TestSetKeyRestoresPreviousFileOnFailure(t *testing.T) {
 		t.Fatalf("key file = %q", data)
 	}
 }
+
+func TestPair(t *testing.T) {
+	t.Setenv("NODECTL_FAKE_DAEMON", "serve")
+	n := newTestNode(t, nil)
+	const hub = "wss://mesh.example.com/node"
+
+	// A machine with no config: Pair writes one and starts the node.
+	result, err := n.Pair(t.Context(), hub, "studio")
+	if err != nil || !result.Created || !result.Started || result.Restarted {
+		t.Fatalf("first Pair = %+v, %v", result, err)
+	}
+	s := n.Inspect(t.Context())
+	if !s.Daemon.Running || s.Config.Err != "" || s.Config.Hub != hub || s.Config.Node != "studio" || s.Config.Key.Set() {
+		t.Fatalf("after first Pair: daemon %v, config %+v", s.Daemon.Running, s.Config)
+	}
+	first := s.Daemon.Status.PID
+
+	// A machine with a key: Pair drops it (and the file SetKey wrote) and
+	// points the node at the new hub and name. The running node reloads.
+	if _, err := n.SetKey(t.Context(), testNodeKey); err != nil {
+		t.Fatal(err)
+	}
+	keyFile := n.DefaultKeyFile()
+	const other = "ws://hub.lan:7001/node"
+	result, err = n.Pair(t.Context(), other, "desk")
+	if err != nil || result.Created || result.Started || result.Restarted {
+		t.Fatalf("Pair with a key = %+v, %v", result, err)
+	}
+	if _, err := os.Stat(keyFile); !os.IsNotExist(err) {
+		t.Fatalf("key file kept: %v", err)
+	}
+	s = n.Inspect(t.Context())
+	if s.Config.Hub != other || s.Config.Node != "desk" || s.Config.Key.Set() || s.Daemon.Status.PID != first {
+		t.Fatalf("after Pair with a key: pid %d (was %d), config %+v", s.Daemon.Status.PID, first, s.Config)
+	}
+	data, _ := os.ReadFile(n.opts.ConfigPath)
+	if !strings.Contains(string(data), "# Choose one credential source") {
+		t.Fatalf("Pair lost the config's comments:\n%s", data)
+	}
+
+	// Nothing to change (say an admin declined): only a restart asks again.
+	result, err = n.Pair(t.Context(), other, "desk")
+	if err != nil || !result.Restarted {
+		t.Fatalf("Pair again = %+v, %v", result, err)
+	}
+	if s := n.Inspect(t.Context()); !s.Daemon.Running || s.Daemon.Status.PID == first {
+		t.Fatalf("not restarted: running %v, pid %d", s.Daemon.Running, s.Daemon.Status.PID)
+	}
+}

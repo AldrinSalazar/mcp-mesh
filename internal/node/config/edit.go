@@ -334,9 +334,17 @@ func removePair(mapping *yaml.Node, i int) {
 	// comment; keep that one.
 	comments := joinComments(mapping.Content[i].FootComment, mapping.Content[i+1].FootComment)
 	mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
-	if i < len(mapping.Content) {
+	switch {
+	case i < len(mapping.Content):
 		mapping.Content[i].HeadComment = joinComments(comments, mapping.Content[i].HeadComment)
-	} else {
+	case len(mapping.Content) > 0:
+		// The new last pair keeps them, as the starter config has them
+		// (SetKeyFile reads them back from there). On the mapping itself the
+		// encoder moves them into whatever key follows it, and again on
+		// every edit.
+		last := mapping.Content[len(mapping.Content)-1]
+		last.FootComment = joinComments(last.FootComment, comments)
+	default:
 		mapping.FootComment = joinComments(comments, mapping.FootComment)
 	}
 }

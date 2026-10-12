@@ -18,6 +18,7 @@ import (
 type form struct {
 	add                bool
 	key                bool // one masked field: the hub key
+	pair               bool // hub URL and this machine's name, then pairing
 	choosing, connect  bool
 	inputs             []textinput.Model
 	focus              int
@@ -72,6 +73,63 @@ func (m *model) openKeyForm() tea.Cmd {
 	m.form = f
 	m.notice = ""
 	return m.focusForm(0)
+}
+
+// openPairForm starts pairing: pick the hub (found on the network or
+// typed), confirm this machine's name, then the node asks to join.
+func (m *model) openPairForm() tea.Cmd {
+	f := &form{pair: true, picking: true, inputs: make([]textinput.Model, 2)}
+	for i := range f.inputs {
+		f.inputs[i] = textinput.New()
+		f.inputs[i].CharLimit = 4096
+		f.inputs[i].SetWidth(max(1, m.width-4))
+	}
+	hub := m.snapshot.Config.Hub
+	if hub == "" {
+		hub = "ws://"
+	}
+	f.inputs[0].SetValue(hub)
+	f.inputs[1].SetValue(m.snapshot.Config.Node)
+	f.inputs[1].CharLimit = 128
+	f.setDark(m.dark)
+	m.form = f
+	m.notice = ""
+	return m.discover()
+}
+
+// startPairing is p. A machine that already has a key confirms first:
+// pairing again drops it. A node already waiting for approval just shows
+// its code.
+func (m *model) startPairing() tea.Cmd {
+	s := m.snapshot
+	switch {
+	case !m.inspected:
+		return nil
+	case s.Config.Exists && s.Config.Err != "":
+		m.setNotice("Fix the config with e before pairing: "+s.Config.Err, true)
+		return nil
+	case s.Config.Key.Set():
+		m.confirm = "pair"
+		return nil
+	case s.Daemon.Running && s.Daemon.Status.Hub.PairCode != "":
+		m.pairing, m.pairFresh = true, true
+		return nil
+	}
+	return m.openPairForm()
+}
+
+// pair asks the node to pair with the form's hub under its name, or again
+// with the config's after a failed request.
+func (m *model) pair(hub, name string) tea.Cmd {
+	node := m.node
+	return m.begin("Asking the hub to pair…", func(ctx context.Context) actionMsg {
+		result, err := node.Pair(ctx, hub, name)
+		label := "asked the hub to pair"
+		if result.Started {
+			label = "node started · asked the hub to pair"
+		}
+		return actionMsg{label: label, failure: "pair", err: err, form: true, pairing: true}
+	})
 }
 
 func isURL(s string) bool { return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") }
@@ -150,6 +208,18 @@ func (m *model) saveForm() tea.Cmd {
 			return actionMsg{label: label, failure: "save key", err: err, form: true}
 		})
 	}
+	if f.pair {
+		hub, name := strings.TrimSpace(f.inputs[0].Value()), strings.TrimSpace(f.inputs[1].Value())
+		if err := validateURL(hub, "ws", "wss"); err != nil {
+			f.err = err.Error()
+			return nil
+		}
+		if err := validNodeName(name); err != nil {
+			f.err = err.Error()
+			return nil
+		}
+		return m.pair(hub, name)
+	}
 	if !f.add {
 		hub := strings.TrimSpace(f.inputs[0].Value())
 		if err := validateURL(hub, "ws", "wss"); err != nil {
@@ -211,7 +281,7 @@ func (m *model) updateForm(msg tea.Msg) tea.Cmd {
 		case "ctrl+s":
 			return m.saveForm()
 		case "enter":
-			if !f.add || f.focus == 3 {
+			if f.focus == len(f.inputs)-1 {
 				return m.saveForm()
 			}
 			return m.focusForm((f.focus + 1) % len(f.inputs))
@@ -263,6 +333,9 @@ func (m *model) formLines() []string {
 	if f.key {
 		title, labels = "Set hub key", []string{"Node key"}
 	}
+	if f.pair {
+		title, labels = "Pair with a hub", []string{"Hub URL", "This machine's name in the mesh"}
+	}
 	if f.add {
 		title = "Add MCP"
 		labels = []string{"Command", "Name", "Start", "Allowed tools (comma-separated; empty = all)"}
@@ -277,6 +350,8 @@ func (m *model) formLines() []string {
 	if f.key {
 		lines[1] = m.dim("Paste the key created on the hub for this node:")
 		lines = append(lines, m.dim("mcp-mesh-hub key create node "+singleLine(m.snapshot.Config.Node)))
+	} else if f.pair {
+		lines[1] = m.dim("The node asks the hub to join; an admin approves it in the hub's dashboard. No key to copy.")
 	} else if !f.add {
 		lines[1] = m.dim("Enter your hub’s node endpoint URL.")
 	}

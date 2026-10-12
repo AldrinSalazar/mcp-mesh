@@ -80,9 +80,13 @@ func (m *model) updatePicker(msg tea.Msg) tea.Cmd {
 		m.cancelDiscovery()
 		f.picking, f.searching = false, false
 		if f.choice == len(f.hubs) {
-			return f.inputs[0].Focus()
+			return m.focusForm(0)
 		}
 		f.inputs[0].SetValue(f.hubs[f.choice].URL)
+		if f.pair {
+			// Then the name, which the hub shows and binds the key to.
+			return m.focusForm(1)
+		}
 		return m.saveForm()
 	}
 	return nil
@@ -92,7 +96,11 @@ func (m *model) pickerLines() []string {
 	// Matches the create-config modal's inner width in View.
 	width := max(1, min(80, m.width)-4)
 	f := m.form
-	lines := []string{m.bold("Create config"), m.dim("Choose your hub"), ""}
+	title := "Create config"
+	if f.pair {
+		title = "Pair with a hub"
+	}
+	lines := []string{m.bold(title), m.dim("Choose your hub"), ""}
 	if f.searching {
 		lines = append(lines, m.accent(m.indicator.View())+" Searching the local network…")
 	}

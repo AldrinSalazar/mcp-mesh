@@ -188,3 +188,35 @@ func TestSetKeyFileRejectsInsecureHub(t *testing.T) {
 		t.Fatalf("config changed:\n%s", after)
 	}
 }
+
+// Clearing a key from a config with a node block after hub keeps the
+// credential comments under hub, and later edits leave the file as it is.
+func TestClearKeyKeepsCommentsUnderHub(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "node.yaml")
+	if err := Create(path, "ws://hub.lan:7001/node", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetNodeName(path, "studio"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := StoreKey(path, "mm_node_0123456789abcdefghijklmnop"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ClearKey(path); err != nil {
+		t.Fatal(err)
+	}
+	cleared, _ := os.ReadFile(path)
+	hub, node := strings.Index(string(cleared), "# Choose one credential source"), strings.Index(string(cleared), "\nnode:")
+	if hub < 0 || node < 0 || hub > node {
+		t.Fatalf("credential comments left hub:\n%s", cleared)
+	}
+	if err := SetHubURL(path, "ws://hub.lan:7001/node"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetNodeName(path, "studio"); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := os.ReadFile(path); string(again) != string(cleared) {
+		t.Fatalf("a no-op edit changed the file:\n%s\n---\n%s", cleared, again)
+	}
+}

@@ -33,6 +33,7 @@ type Node interface {
 	RemoveMCP(context.Context, string) (bool, error)
 	SetDisabled(context.Context, string, bool) (bool, error)
 	SetKey(context.Context, string) (nodectl.KeyResult, error)
+	Pair(ctx context.Context, hubURL, name string) (nodectl.PairResult, error)
 	Reload(context.Context) error
 	Restart(context.Context, string) error
 	Logs(context.Context, string, int) ([]byte, error)

@@ -80,6 +80,9 @@ func (m *model) cards() []statusCard {
 			hub.detail = singleLine(h.LastError)
 			if h.KeyRejected {
 				hub.state, hub.detail = m.red("● key rejected"), singleLine(h.KeyReason)
+				if !s.Config.Key.Set() {
+					hub.state, hub.detail = m.red("● not joined"), singleLine(h.KeyReason)+" · p pair"
+				}
 			}
 		}
 	}
@@ -165,11 +168,16 @@ func (m *model) guidance() []string {
 			hint += ", or i to start it now and at every login"
 		}
 		lines = append(lines, hint+".")
-	} else if h := s.Daemon.Status.Hub; h.KeyRejected {
+	} else if h := s.Daemon.Status.Hub; h.KeyRejected && !s.Config.Key.Set() {
+		lines = append(lines,
+			m.red("This machine hasn't joined the hub: "+singleLine(h.KeyReason)+"."),
+			"Press p to pair: an admin approves it in the hub's dashboard. Or K to set a key made on the hub.")
+	} else if h.KeyRejected {
 		lines = append(lines,
 			m.red("The hub rejected this node's key: "+singleLine(h.KeyReason)+"."),
 			"Create one on the hub (mcp-mesh-hub key create node "+singleLine(s.Config.Node)+"), then press K or run: mcp-mesh-node key set <key>")
-	} else if !h.Connected {
+	} else if !h.Connected && h.LastError != "" {
+		// A node waiting for approval has no error: the notice says what to do.
 		lines = append(lines, "Hub: "+singleLine(h.LastError)+" · keeps retrying")
 	}
 	return lines
