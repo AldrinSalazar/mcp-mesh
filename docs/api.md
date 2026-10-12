@@ -21,10 +21,10 @@ Served on the hub's admin listener next to the dashboard. The dashboard SPA uses
 ### `GET /info` (always open)
 
 ```json
-{"version":"1.0.0","auth":true,"node_url":"wss://hub.example/node","client_url":"https://hub.example/mcp","discovery_name":"home-hub","oauth":true}
+{"version":"1.0.0","auth":true,"node_url":"wss://hub.example/node","client_url":"https://hub.example/mcp","discovery_name":"home-hub","oauth":true,"started_at":"2026-10-12T09:00:00Z"}
 ```
 
-`oauth` is true when clients can connect with OAuth instead of a pasted key (auth on): the hub is its own authorization server, discovered from `client_url`.
+`started_at` is when the hub started: for a minute after, the dashboard shows offline nodes as reconnecting. `oauth` is true when clients can connect with OAuth instead of a pasted key (auth on): the hub is its own authorization server, discovered from `client_url`.
 
 ### Session
 
@@ -49,9 +49,11 @@ Served on the hub's admin listener next to the dashboard. The dashboard SPA uses
   "online":false,"disconnected_at":"2026-10-09T09:00:00Z","mcps":[]}]
 ```
 
-`state` is one of `opening`, `ready`, `idle`, `failed`, `closed`. Each MCP also has `prompts`, `resources` (resources and templates), `call_timeout_ms` (its own call timeout from node.yaml; `0` means the hub default) and `clients`: for `sharing: "per-client"` MCPs, how many clients have a process of their own right now. `problems` is an array of strings (`[]` when none): definitions the hub dropped from the MCP's last listing (invalid or oversized tools, for instance), and why. Offline nodes stay listed during the hub's grace period.
+`state` is one of `opening`, `ready`, `idle`, `failed`, `closed`. Each MCP also has `prompts`, `resources` (resources and templates), `call_timeout_ms` (its own call timeout from node.yaml; `0` means the hub default) and `clients`: for `sharing: "per-client"` MCPs, how many clients have a process of their own right now. `problems` is an array of strings (`[]` when none): definitions the hub dropped from the MCP's last listing (invalid or oversized tools, for instance), and why. Offline nodes stay listed: the hub remembers every node that has connected (across restarts too), and lists one that isn't connected with `online: false`, `disconnected_at` as when it was last seen, and its MCPs as last listed (`state: "closed"`).
 
 Each node also has `"trust":{"level":"trust","explicit":false,"approved":true}` and `"pending_tools":0`. `level` is `trust` (every tool visible), `review` (new tools visible, a changed tool waits for approval) or `approve` (the node waits for approval, then every new or changed tool does). `explicit` is false when the node follows the hub default (`GET /settings`). `approved` matters for `approve`: until then none of the node's tools are visible. `pending_tools` counts its tools waiting for approval.
+
+`DELETE /nodes/{name}` forgets an offline node: it is no longer listed until it connects again. Its key, trust level and approvals stay. 204; 404 for a node the hub doesn't know; 409 while it is connected.
 
 `PUT /nodes/{name}/trust` with `{"level":"review"}` sets a node's level (also for a node that isn't connected, to prepare it), or `{"level":null}` to follow the hub default again. 200 with the new `trust` object; 400 for an unknown level.
 

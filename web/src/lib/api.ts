@@ -147,6 +147,9 @@ export const api = {
   setTrustDefault: (level: TrustLevel) => request<Settings>('PUT', '/settings', { trust_default: level }),
   adminLog: (q: { before_id?: number; limit?: number } = {}) =>
     request<{ entries: AdminLogEntry[]; next_before_id: number }>('GET', '/admin-log' + query(q)),
+  // forgetNode removes an offline node from the list (the hub remembers
+  // every node that connected).
+  forgetNode: (name: string) => request<void>('DELETE', `/nodes/${encodeURIComponent(name)}`),
   revokeKey: (id: string) => request<{ key: Key }>('DELETE', `/keys/${encodeURIComponent(id)}`),
 
   admins: () => request<Admin[]>('GET', '/admins'),

@@ -28,6 +28,8 @@ export function mockApi(mode: string): Plugin {
     failures: 0,
   }
   const csrf = 'mock-csrf-token'
+  // Up for an hour: its nodes aren't reconnecting from a restart.
+  const startedAt = new Date(Date.now() - 3_600_000).toISOString()
   const subs = new Set<(type: string) => void>()
   const emit = (type: string) => subs.forEach((f) => f(type))
 
@@ -102,7 +104,7 @@ export function mockApi(mode: string): Plugin {
         const signed = !authOn || !!st.session
         await new Promise((r) => setTimeout(r, 120)) // feel like a network
 
-        if (path === '/info') return json(res, 200, { ...fx.info, auth: authOn })
+        if (path === '/info') return json(res, 200, { ...fx.info, auth: authOn, started_at: startedAt })
         if (path === '/session') {
           if (!authOn) return json(res, 200, { auth: false })
           if (m === 'GET') return st.session ? json(res, 200, { username: st.session, csrf, expires: new Date(Date.now() + 7 * 864e5).toISOString() }) : err(res, 401, 'sign in required')
@@ -188,6 +190,17 @@ export function mockApi(mode: string): Plugin {
           log('tool.approve', b.tools.map((r) => `${r.node}/${r.mcp}/${r.tool}`).join(', '), String(n))
           syncApprovals()
           return json(res, 200, { approved: n })
+        }
+        const forgetM = path.match(/^\/nodes\/([^/]+)$/)
+        if (forgetM && m === 'DELETE') {
+          const name = decodeURIComponent(forgetM[1]!)
+          const node = st.nodes.find((x) => x.name === name)
+          if (!node) return err(res, 404, 'no such node')
+          if (node.online) return err(res, 409, `${name} is connected; only an offline node can be forgotten`)
+          st.nodes = st.nodes.filter((x) => x !== node)
+          log('node.forget', name)
+          emit('nodes')
+          return json(res, 204)
         }
         const trustM = path.match(/^\/nodes\/([^/]+)\/(trust|approve)$/)
         if (trustM) {

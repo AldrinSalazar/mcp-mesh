@@ -11,7 +11,7 @@ import { toast } from '@/lib/toast'
 import { refresh } from '@/lib/live'
 import { trustChoice, trustLabel, trustOptions, trustText } from '@/lib/trust'
 import type { TrustLevel } from '@/lib/types'
-import { host, osLabel, plural, since } from '@/lib/format'
+import { agoLong, host, osLabel, plural, since } from '@/lib/format'
 import { live } from '@/lib/live'
 import { mcpStatus, nodeStatus, startLabel, transportLabel, type Tone } from '@/lib/status'
 import type { MCP, Node } from '@/lib/types'
@@ -19,9 +19,9 @@ import McpProblems from './McpProblems.vue'
 import { clientsLabel, isPerClient, offersLabel, timeoutLabel } from './mcpinfo'
 
 const props = defineProps<{ node: Node; expanded: boolean; now: number }>()
-const emit = defineEmits<{ toggle: []; revoke: [] }>()
+const emit = defineEmits<{ toggle: []; revoke: []; forget: [] }>()
 
-const status = computed(() => nodeStatus(props.node))
+const status = computed(() => nodeStatus(props.node, live.info?.started_at, props.now))
 
 const trustOpts = computed(() => trustOptions(live.settings?.trust_default))
 const trustNote = computed(() => trustText(props.node.trust.level))
@@ -65,7 +65,7 @@ const counts = computed(() => `${plural(props.node.mcps.length, 'MCP')} / ${plur
 const address = computed(() => host(props.node.remote_addr))
 const lifetime = computed(() => {
   if (props.node.online) return `Connected for ${since(props.node.connected_at, props.now)}`
-  return props.node.disconnected_at ? `Offline for ${since(props.node.disconnected_at, props.now)}` : 'Offline'
+  return props.node.disconnected_at ? `Last seen ${agoLong(props.node.disconnected_at, props.now)}` : 'Offline'
 })
 // Collapsed rows show just the span, as in the design.
 const shortLifetime = computed(() => lifetime.value.replace(/^Connected for /, ''))
@@ -117,9 +117,10 @@ const rows = computed<Row[]>(() =>
         </div>
         <UiBadge :tone="status.tone" class="state">{{ status.label }}</UiBadge>
         <span class="counts">{{ counts }}</span>
-        <div v-if="!live.authOff && node.key_id" class="actions">
-          <RouterLink to="/keys" class="keylink truncate" :title="keyName">Key: {{ keyName }} <span aria-hidden="true">→</span></RouterLink>
-          <UiButton :disabled="!node.online" @click="emit('revoke')">Revoke key</UiButton>
+        <div v-if="(!live.authOff && node.key_id) || !node.online" class="actions">
+          <RouterLink v-if="!live.authOff && node.key_id" to="/keys" class="keylink truncate" :title="keyName">Key: {{ keyName }} <span aria-hidden="true">→</span></RouterLink>
+          <UiButton v-if="node.online && !live.authOff && node.key_id" @click="emit('revoke')">Revoke key</UiButton>
+          <UiButton v-if="!node.online" @click="emit('forget')">Forget</UiButton>
         </div>
       </div>
 

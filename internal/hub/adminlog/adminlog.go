@@ -28,6 +28,7 @@ const (
 	GroupDelete    = "group.delete"    //
 	TrustLevel     = "trust.level"     // target: node ("" for the hub default); detail: level
 	NodeApprove    = "node.approve"    // target: node
+	NodeForget     = "node.forget"     // target: node
 	ToolApprove    = "tool.approve"    // target: node/mcp/tool (or a prefix); detail: count
 	ToolOverride   = "tool.override"   // target: node/mcp/tool; detail: alias ("" if none or cleared)
 	OAuthAuthorize = "oauth.authorize" // target: key ID; detail: client name

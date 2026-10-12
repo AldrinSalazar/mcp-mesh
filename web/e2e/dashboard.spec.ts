@@ -142,3 +142,17 @@ test('signing out ends the session', async ({ page }) => {
   await page.goto('/keys')
   await expect(page).toHaveURL(/\/sign-in/)
 })
+
+// Last: it changes the mock's nodes for the rest of the run.
+test('an offline machine stays listed until it is forgotten', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/nodes?node=studio-pc')
+  const card = page.locator('#node-studio-pc')
+  await expect(card.getByText('Offline', { exact: true })).toBeVisible()
+  await expect(card.getByText(/Last seen .* ago/)).toBeVisible()
+  await card.getByRole('button', { name: 'Forget' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Forget studio-pc?' })
+  await expect(dialog.getByText('if it connects again, it shows up again')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Forget' }).click()
+  await expect(page.locator('#node-studio-pc')).toHaveCount(0)
+})

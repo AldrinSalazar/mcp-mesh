@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeClients, keyConnection, mcpStatus, problems } from './status'
+import { activeClients, keyConnection, mcpStatus, nodeStatus, problems } from './status'
 import type { Key, MCP, Node } from './types'
 
 const mcp = (over: Partial<MCP>): MCP => ({
@@ -31,6 +31,26 @@ describe('problems', () => {
       { name: 'studio', node_version: '', os: '', remote_addr: '', key_id: '', connected_at: '', online: false, mcps: [], trust: { level: 'trust', explicit: false, approved: true }, pending_tools: 0 },
     ]
     expect(problems(nodes).map((p) => p.title)).toEqual(['Blender is waiting for the app', 'studio is offline'])
+  })
+
+  const offline = (name: string, at: string): Node => ({ name, node_version: '', os: '', remote_addr: '', key_id: '', connected_at: '', online: false, disconnected_at: at, mcps: [mcp({})], trust: { level: 'trust', explicit: false, approved: true }, pending_tools: 0 })
+  const now = Date.parse('2026-10-12T12:00:00Z')
+
+  it('says so once when every node is offline', () => {
+    const nodes = [offline('desk', '2026-10-12T09:00:00Z'), offline('studio', '2026-10-12T11:00:00Z')]
+    expect(problems(nodes, '2026-10-12T08:00:00Z', now)).toEqual([
+      { kind: 'node', node: '', title: 'All 2 nodes are offline', detail: 'desk, studio', tone: 'err', since: '2026-10-12T11:00:00Z' },
+    ])
+  })
+
+  it('waits for nodes reconnecting after the hub started', () => {
+    const nodes = [offline('desk', '2026-10-12T09:00:00Z'), offline('studio', '2026-10-12T09:00:00Z')]
+    const started = new Date(now - 20_000).toISOString()
+    expect(problems(nodes, started, now)).toEqual([])
+    expect(nodeStatus(nodes[0]!, started, now)).toEqual({ label: 'Reconnecting', tone: 'warn' })
+    // A minute on, they're offline.
+    expect(nodeStatus(nodes[0]!, started, now + 60_000)).toEqual({ label: 'Offline', tone: 'err' })
+    expect(problems(nodes, started, now + 60_000)[0]!.title).toBe('All 2 nodes are offline')
   })
 })
 

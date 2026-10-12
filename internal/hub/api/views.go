@@ -2,11 +2,14 @@ package api
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/activity"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/auth"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/catalog"
+	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/trust"
 )
 
@@ -171,6 +174,7 @@ func (s *Server) nodeViews() []nodeView {
 	for _, p := range s.approvalViews() {
 		pending[p.Node]++
 	}
+	listed := map[string]bool{}
 	for _, n := range s.opts.Nodes.Nodes() {
 		mcps := make([]mcpView, 0, len(n.MCPs))
 		for _, m := range n.MCPs {
@@ -190,6 +194,28 @@ func (s *Server) nodeViews() []nodeView {
 			v.DisconnectedAt = &at
 		}
 		out = append(out, v)
+		listed[n.Name] = true
+	}
+	// Nodes the registry no longer holds are offline, as last seen.
+	if s.opts.Known != nil {
+		for _, k := range s.opts.Known.List() {
+			if listed[k.Name] {
+				continue
+			}
+			mcps := make([]mcpView, 0, len(k.MCPs))
+			for _, m := range k.MCPs {
+				mcps = append(mcps, mcpView{Name: m.Name, Transport: m.Transport, Sharing: m.Sharing, Start: m.Start,
+					State: string(nodes.MCPClosed), Tools: m.Tools, Server: m.Server, Prompts: m.Prompts, Resources: m.Resources, Problems: []string{}})
+			}
+			at := k.LastSeen
+			v := nodeView{Name: k.Name, NodeVersion: k.NodeVersion, OS: k.OS, RemoteAddr: k.RemoteAddr, KeyID: k.KeyID,
+				DisconnectedAt: &at, MCPs: mcps, Trust: trustView{Level: trust.Trust, Approved: true}, PendingTools: pending[k.Name]}
+			if s.opts.Trust != nil {
+				v.Trust = newTrustView(s.opts.Trust.Policy(k.Name))
+			}
+			out = append(out, v)
+		}
+		slices.SortFunc(out, func(a, b nodeView) int { return strings.Compare(a.Name, b.Name) })
 	}
 	return out
 }

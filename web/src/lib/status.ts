@@ -37,8 +37,18 @@ export function mcpStatus(m: MCP, nodeOnline = true): Status {
   return { label: m.state, tone: 'neutral' }
 }
 
-export function nodeStatus(n: Node): Status {
-  return n.online ? { label: 'Online', tone: 'ok' } : { label: 'Offline', tone: 'err' }
+// For this long after the hub starts, its offline nodes are expected back:
+// they reconnect within seconds of a restart.
+export const reconnectWindow = 60_000
+
+export function reconnecting(n: Node, startedAt: string | undefined, now: number = Date.now()): boolean {
+  return !n.online && !!startedAt && now - new Date(startedAt).getTime() < reconnectWindow
+}
+
+export function nodeStatus(n: Node, startedAt?: string, now: number = Date.now()): Status {
+  if (n.online) return { label: 'Online', tone: 'ok' }
+  if (reconnecting(n, startedAt, now)) return { label: 'Reconnecting', tone: 'warn' }
+  return { label: 'Offline', tone: 'err' }
 }
 
 export function outcomeStatus(o: Outcome): Status {
@@ -100,12 +110,20 @@ export interface Problem {
 }
 
 // problems lists what needs attention: offline nodes and MCPs that are
-// failing or waiting for their app.
-export function problems(nodes: Node[]): Problem[] {
+// failing or waiting for their app. Nodes still reconnecting after the hub
+// started aren't a problem yet; when every node is offline that's one item.
+export function problems(nodes: Node[], startedAt?: string, now: number = Date.now()): Problem[] {
   const out: Problem[] = []
+  const offline = nodes.filter((n) => !n.online && !reconnecting(n, startedAt, now))
+  if (nodes.length > 1 && offline.length === nodes.length) {
+    const last = offline.map((n) => n.disconnected_at).filter((t): t is string => !!t).sort().at(-1)
+    return [{ kind: 'node', node: '', title: `All ${nodes.length} nodes are offline`, detail: offline.map((n) => n.name).join(', '), tone: 'err', since: last }]
+  }
   for (const n of nodes) {
     if (!n.online) {
-      out.push({ kind: 'node', node: n.name, title: `${n.name} is offline`, detail: '', tone: 'err', since: n.disconnected_at })
+      if (!reconnecting(n, startedAt, now)) {
+        out.push({ kind: 'node', node: n.name, title: `${n.name} is offline`, detail: '', tone: 'err', since: n.disconnected_at })
+      }
       continue
     }
     for (const m of n.mcps) {

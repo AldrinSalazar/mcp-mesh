@@ -6,6 +6,7 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiNotice from '@/components/ui/UiNotice.vue'
 import { host, osLabel, plural, since } from '@/lib/format'
+import { live } from '@/lib/live'
 import { mcpStatus, nodeStatus } from '@/lib/status'
 import { trustLabel } from '@/lib/trust'
 import type { Node } from '@/lib/types'
@@ -15,7 +16,7 @@ import McpProblems from '@/components/nodes/McpProblems.vue'
 const props = defineProps<{ node: Node; now: number }>()
 defineEmits<{ view: [] }>()
 
-const status = computed(() => nodeStatus(props.node))
+const status = computed(() => nodeStatus(props.node, live.info?.started_at, props.now))
 const tools = computed(() => props.node.mcps.reduce((s, m) => s + m.tools, 0))
 const rows = computed(() => props.node.mcps.map((m) => ({ mcp: m, status: mcpStatus(m, props.node.online) })))
 // Apps whose MCP isn't reachable; the app name is the MCP name, capitalised.

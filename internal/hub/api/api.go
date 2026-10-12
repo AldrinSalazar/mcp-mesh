@@ -19,6 +19,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/activity"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/auth"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/catalog"
+	"github.com/AldrinSalazar/mcp-mesh/internal/hub/known"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 )
 
@@ -62,7 +63,10 @@ type Audit interface {
 
 // Options configure a Server.
 type Options struct {
-	Nodes    interface{ Nodes() []nodes.NodeInfo }
+	Nodes interface{ Nodes() []nodes.NodeInfo }
+	// Known lists the nodes that connected before, so offline ones stay
+	// listed; nil lists only the registry's.
+	Known    Known
 	Catalog  *catalog.Catalog
 	Recent   *activity.Log
 	Audit    Audit    // nil: /audit answers 404
@@ -88,6 +92,9 @@ type Options struct {
 	DisconnectKey func(keyID string)
 
 	Version, NodeURL, ClientURL, DiscoveryName string
+	// StartedAt is when the hub started: for a while after, its nodes are
+	// reconnecting rather than offline.
+	StartedAt time.Time
 
 	// Health reports readiness problems and metrics from the rest of the
 	// hub (GET /health, and /readyz on the admin listener). Nil: only the
@@ -96,6 +103,12 @@ type Options struct {
 
 	Logger *slog.Logger  // nil = slog.Default()
 	Poll   time.Duration // event snapshot interval; 0 = 1s
+}
+
+// Known remembers nodes that have connected.
+type Known interface {
+	List() []known.Node
+	Forget(ctx context.Context, name string) (bool, error)
 }
 
 // Server is the API handler plus the events feed.
@@ -165,6 +178,8 @@ func (s *Server) route(path string) (route, map[string]string, bool) {
 		return route{methods: m("GET", s.healthGet)}, nil, true
 	case len(seg) == 1 && seg[0] == "approvals":
 		return route{methods: m("GET", s.approvalsList, "POST", s.approvalsApprove)}, nil, true
+	case len(seg) == 2 && seg[0] == "nodes":
+		return route{methods: m("DELETE", s.nodeForget)}, map[string]string{"name": seg[1]}, true
 	case len(seg) == 3 && seg[0] == "nodes" && seg[2] == "trust":
 		return route{methods: m("PUT", s.nodeTrustSet)}, map[string]string{"name": seg[1]}, true
 	case len(seg) == 3 && seg[0] == "nodes" && seg[2] == "approve":

@@ -9,6 +9,8 @@ export interface Info {
   discovery_name: string
   // oauth: apps can connect through OAuth (the hub is its own authorization server).
   oauth?: boolean
+  // started_at: when the hub started; its nodes are reconnecting for a while after.
+  started_at?: string
 }
 
 export interface Session {
