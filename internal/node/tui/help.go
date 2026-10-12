@@ -6,31 +6,44 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func (m *model) helpLine() string {
+// stateHints are the shortcuts of a modal state (busy, confirming, a form,
+// help), or "" on the main screen, whose shortcuts come in groups.
+func (m *model) stateHints() string {
 	if m.busy {
-		return m.hints("q quit")
+		return "q quit"
 	}
 	if m.confirm != "" {
-		return m.hints("y confirm  n cancel  q quit")
+		return "y confirm  n cancel  q quit"
 	}
 	if m.form != nil {
 		if m.form.choosing {
-			return m.hints("↑/↓ choose  enter select  esc cancel")
+			return "↑/↓ choose  enter select  esc cancel"
 		}
 		if m.form.key {
-			return m.hints("enter save  esc cancel  ctrl+c quit")
+			return "enter save  esc cancel  ctrl+c quit"
 		}
 		if m.form.add {
-			return m.hints("tab/shift+tab field  space/←→ start  enter/ctrl+s save  esc back")
+			return "tab/shift+tab field  space/←→ start  enter/ctrl+s save  esc back"
 		}
 		if m.form.picking {
-			return m.hints("↑/↓ choose  enter select  ctrl+r search again  esc cancel")
+			return "↑/↓ choose  enter select  ctrl+r search again  esc cancel"
 		}
-		return m.hints("enter create  esc cancel  ctrl+c quit")
+		return "enter create  esc cancel  ctrl+c quit"
 	}
 	if m.help {
-		return m.hints("PgUp/PgDn scroll  ? close help  q quit")
+		return "PgUp/PgDn scroll  ? close help  q quit"
 	}
+	return ""
+}
+
+// hintGroup is one titled group of the main screen's shortcuts; each hint
+// is "key description".
+type hintGroup struct {
+	title string
+	hints []string
+}
+
+func (m *model) hintGroups() []hintGroup {
 	var node, mcps, view []string
 	if m.inspected && !m.snapshot.Config.Exists {
 		node = append(node, "n create config")
@@ -68,22 +81,102 @@ func (m *model) helpLine() string {
 		view = append(view, "PgUp/PgDn scroll")
 	}
 	view = append(view, "? help", "q quit")
-	var groups []string
-	for i, group := range [][]string{node, mcps, view} {
-		if len(group) > 0 {
-			groups = append(groups, m.bold([]string{"Node", "MCPs", "View"}[i])+"  "+m.hints(strings.Join(group, "  ")))
+	var groups []hintGroup
+	for i, hints := range [][]string{node, mcps, view} {
+		if len(hints) > 0 {
+			groups = append(groups, hintGroup{[]string{"Node", "MCPs", "View"}[i], hints})
 		}
 	}
-	return ansi.Truncate(strings.Join(groups, " · "), m.width, "…")
+	return groups
 }
 
-func (m *model) hints(s string) string {
-	pairs := strings.Split(s, "  ")
-	for i, pair := range pairs {
-		key, desc, _ := strings.Cut(pair, " ")
-		pairs[i] = m.accent(key) + " " + m.dim(desc)
+// footerBudget is how many lines the main screen's shortcuts may take: the
+// detail box gives them room, but not most of a short terminal.
+func (m *model) footerBudget() int {
+	return max(1, min(4, m.height/6))
+}
+
+// footerLines lays the shortcuts out in width, in at most maxLines lines,
+// never cutting a hint in two. The main screen tries, in order: one line;
+// a line per group, wrapped between hints; then only the keys, with ? help
+// and q quit first, so the part that doesn't fit is what ? lists anyway.
+func (m *model) footerLines(width, maxLines int) []string {
+	width, maxLines = max(1, width), max(1, maxLines)
+	if s := m.stateHints(); s != "" {
+		return packHints(m.styledHints(strings.Split(s, "  ")), width, maxLines)
 	}
-	return ansi.Truncate(strings.Join(pairs, "  "), m.width, "…")
+	groups := m.hintGroups()
+	var parts []string
+	for _, g := range groups {
+		parts = append(parts, m.bold(g.title)+"  "+strings.Join(m.styledHints(g.hints), "  "))
+	}
+	if line := strings.Join(parts, " · "); ansi.StringWidth(line) <= width {
+		return []string{line}
+	}
+	var lines []string
+	for _, g := range groups {
+		// Titles are four letters; continuation lines line up under the hints.
+		group := packHints(m.styledHints(g.hints), width-6, 0)
+		for i, line := range group {
+			prefix := strings.Repeat(" ", 6)
+			if i == 0 {
+				prefix = m.bold(g.title) + "  "
+			}
+			lines = append(lines, prefix+line)
+		}
+	}
+	if len(lines) <= maxLines && width > 6 {
+		return lines
+	}
+	var keys []string
+	for _, g := range groups {
+		for _, hint := range g.hints {
+			if hint != "? help" && hint != "q quit" {
+				key, _, _ := strings.Cut(hint, " ")
+				keys = append(keys, m.accent(key))
+			}
+		}
+	}
+	return packHints(append(m.styledHints([]string{"? help", "q quit"}), keys...), width, maxLines)
+}
+
+// styledHints colors each "key description" hint.
+func (m *model) styledHints(hints []string) []string {
+	styled := make([]string, len(hints))
+	for i, hint := range hints {
+		key, desc, _ := strings.Cut(hint, " ")
+		styled[i] = m.accent(key) + " " + m.dim(desc)
+	}
+	return styled
+}
+
+// packHints fills lines of width with hints two spaces apart, breaking only
+// between hints; a hint wider than a line on its own is truncated. maxLines
+// > 0 drops the hints that don't fit in that many lines.
+func packHints(hints []string, width, maxLines int) []string {
+	var lines []string
+	line := ""
+	for _, hint := range hints {
+		switch {
+		case line == "":
+			line = hint
+		case ansi.StringWidth(line)+2+ansi.StringWidth(hint) <= width:
+			line += "  " + hint
+		default:
+			lines = append(lines, line)
+			line = hint
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], width, "…")
+	}
+	if maxLines > 0 && len(lines) > maxLines {
+		lines = lines[:maxLines]
+	}
+	return lines
 }
 
 func (m *model) helpLines() []string {

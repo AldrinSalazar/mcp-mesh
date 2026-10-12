@@ -344,7 +344,7 @@ func TestUnsupportedServiceAndEmptyConfig(t *testing.T) {
 	f.snapshot.Config.Entries = nil
 	inspect(t, m)
 	contains(t, m.View().Content, "s start", "No MCPs yet. Press a to add one.")
-	absent(t, m.helpLine(), "i start at login")
+	absent(t, strings.Join(m.footerLines(m.width, m.footerBudget()), "\n"), "i start at login")
 	absent(t, strings.Join(m.guidance(), "\n"), "or i")
 	_, cmd := m.Update(key("i"))
 	if cmd != nil || m.confirm != "" {

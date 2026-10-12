@@ -88,13 +88,13 @@ func (m *model) box(lines []string, title string, width int) []string {
 	return append(out, border("╰"+strings.Repeat("─", inner)+"╯"))
 }
 
-func (m *model) modal(lines []string, footer string, width int) string {
+func (m *model) modal(lines []string, width int) string {
 	inner := max(1, width-4)
 	var wrapped []string
 	for _, line := range lines {
 		wrapped = append(wrapped, strings.Split(ansi.Wrap(line, inner, ""), "\n")...)
 	}
-	footerLines := strings.Split(ansi.Wrap(footer, inner, ""), "\n")
+	footerLines := m.footerLines(inner, 3)
 	limit := max(1, m.height-3-len(footerLines))
 	wrapped = wrapped[:min(len(wrapped), limit)]
 	wrapped = append(wrapped, "")

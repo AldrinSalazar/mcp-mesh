@@ -14,7 +14,7 @@ func (m *model) View() tea.View {
 		lines := m.helpLines()
 		page := max(1, m.height-6)
 		first := min(m.helpOffset, max(0, len(lines)-page))
-		content = m.modal(lines[first:min(len(lines), first+page)], m.helpLine(), min(96, m.width))
+		content = m.modal(lines[first:min(len(lines), first+page)], min(96, m.width))
 	case m.form != nil:
 		lines := m.formLines()
 		if m.form.choosing {
@@ -26,26 +26,29 @@ func (m *model) View() tea.View {
 		if m.busy {
 			lines = append(lines, m.noticeLine())
 		}
-		content = m.modal(lines, m.helpLine(), min(80, m.width))
+		content = m.modal(lines, min(80, m.width))
 	case m.confirm != "":
-		content = m.modal(m.confirmLines(), m.hints("y confirm  n cancel  q quit"), min(76, m.width))
+		content = m.modal(m.confirmLines(), min(76, m.width))
 	case m.inspected && !m.snapshot.Config.Exists:
 		lines := []string{m.badge(), "", "Welcome! This node shares your MCP servers with agents through one hub.", m.dim(singleLine(homePath(m.snapshot.ConfigPath))), m.dim("Config not created yet"), "", m.accent("n  create config")}
 		if m.notice != "" {
 			lines = append(lines, m.noticeLine())
 		}
-		content = m.modal(lines, m.helpLine(), min(76, m.width))
+		content = m.modal(lines, min(76, m.width))
 	default:
 		lines := m.topLines()
 		if _, ok := m.selectedMCP(); ok && m.snapshot.Config.Exists && m.viewport.Height() > 0 {
 			lines = append(lines, m.box(strings.Split(m.viewport.View(), "\n"), m.detailTitle(), m.width)...)
 		}
+		// The shortcuts and the notice come first: the content above gives
+		// way to them.
+		footer := m.footerLines(m.width, m.footerBudget())
+		footer = footer[:min(len(footer), m.height)]
 		notice := m.noticeLines()
-		lines = lines[:min(len(lines), max(0, m.height-1-len(notice)))]
-		if m.height > 1 {
-			lines = append(lines, notice[:min(len(notice), m.height-1)]...)
-		}
-		lines = append(lines, m.helpLine())
+		notice = notice[:min(len(notice), max(0, m.height-len(footer)))]
+		lines = lines[:min(len(lines), max(0, m.height-len(footer)-len(notice)))]
+		lines = append(lines, notice...)
+		lines = append(lines, footer...)
 		content = strings.Join(lines, "\n")
 	}
 	lines := strings.Split(content, "\n")
