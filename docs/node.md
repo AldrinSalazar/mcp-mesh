@@ -76,10 +76,14 @@ a key.
    connects. From then on it uses that key, through restarts too; it never
    pairs again unless the key is removed (`key clear`).
 
-Then [add MCPs](#launch-or-connect). Running `mcp-mesh-node` alone opens an
-interactive dashboard that does all of this too: create the config, pick a
-hub found on the network, start the node (its Hub card shows the code while
-the request waits), add MCPs, show logs and tools.
+Then [add MCPs](#launch-or-connect).
+
+Running `mcp-mesh-node` alone opens an interactive dashboard that does all
+of this with one key: **p** (pair with a hub) lists the hubs it finds on the
+network (or takes a URL), asks for this machine's name, writes the config,
+starts the node and shows the code large until an admin approves it. On a
+machine that already has a key, **p** asks first: pairing again removes it.
+A key made on the hub is under **?** → *Other ways to join* (**K**).
 
 The code is what makes approving safe: anyone who can reach the hub's node
 port can ask to join, under any name, but only the machine you set up shows
@@ -90,7 +94,7 @@ haven't checked.
 
 | What you see | Why, and what to do |
 | --- | --- |
-| *pairing declined* | An admin declined the request. The node doesn't ask again until it restarts: `mcp-mesh-node stop && mcp-mesh-node start`. |
+| *pairing declined* | An admin declined the request. The node doesn't ask again until it restarts: `mcp-mesh-node stop && mcp-mesh-node start`, or **r** on the dashboard's pairing screen. |
 | *Name in use* on the request | A node key is already bound to that name, perhaps for this same machine before a reinstall. Approving replaces that key, which disconnects the node using it, or give this machine another name. |
 | *pairing is turned off on this hub* | The hub runs with `--pairing=false`. Use a [key made on the hub](#with-a-key-made-on-the-hub). |
 | *the hub doesn't accept pairing requests* | The hub is older than pairing. Update it, or use a key made on the hub. |

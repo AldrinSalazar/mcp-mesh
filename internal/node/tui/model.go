@@ -57,6 +57,7 @@ type actionMsg struct {
 	failure string
 	err     error
 	form    bool
+	pairing bool // opens the pairing screen once done
 	// selectName is selected once the next snapshot lists it (a new MCP).
 	selectName string
 }
@@ -110,6 +111,8 @@ type model struct {
 	noticeUntil                                    time.Time
 	confirm, confirmName                           string
 	help                                           bool
+	pairing                                        bool // the pairing screen is open
+	pairFresh                                      bool // a snapshot came in since the request
 	helpOffset                                     int
 	form                                           *form
 	indicator                                      spinner.Model
@@ -318,6 +321,7 @@ func (m *model) handleInspect(msg inspectMsg) tea.Cmd {
 	old, _ := m.selectedMCP()
 	previous := m.snapshot.Daemon
 	m.snapshot, m.logsHint, m.inspected = msg.snapshot, msg.hint, true
+	m.pairFresh = m.pairing && !m.busy
 	changedDaemon := previous.Running != msg.snapshot.Daemon.Running || previous.Status.PID != msg.snapshot.Daemon.Status.PID
 	if changedDaemon {
 		m.closeConnection()
@@ -385,6 +389,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if compatible(h) {
 					f.choice = i
 					break
+				}
+			}
+			// Pairing again preselects the hub the config already names.
+			for i, h := range f.hubs {
+				if f.pair && compatible(h) && h.URL == f.inputs[0].Value() {
+					f.choice = i
 				}
 			}
 			m.cancelDiscovery()
@@ -474,6 +484,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.form {
 				m.form = nil
 			}
+			if msg.pairing {
+				m.pairing, m.pairFresh = true, false
+			}
 			m.selectName = msg.selectName
 		}
 		cmd = m.inspect(true)
@@ -536,6 +549,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.notice = ""
 			}
+			break
+		}
+		if m.pairing {
+			cmd = m.updatePairing(msg.String())
 			break
 		}
 		if msg.String() == "?" {

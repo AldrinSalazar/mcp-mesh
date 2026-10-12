@@ -50,6 +50,8 @@ func (m *model) handleKey(key string) tea.Cmd {
 		if m.validConfig() {
 			return m.openForm(true)
 		}
+	case "p":
+		return m.startPairing()
 	case "K":
 		if m.validConfig() {
 			return m.openKeyForm()
@@ -156,6 +158,8 @@ func (m *model) confirmed(action, name string) tea.Cmd {
 		return m.begin("Removing start at login…", func(ctx context.Context) actionMsg {
 			return actionMsg{label: "node no longer starts at login · stopped", failure: "stop starting at login", err: node.Uninstall(ctx)}
 		})
+	case "pair":
+		return m.openPairForm()
 	case "remove":
 		return m.begin("Removing "+name+"…", func(ctx context.Context) actionMsg {
 			pending, err := node.RemoveMCP(ctx, name)

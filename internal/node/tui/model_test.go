@@ -39,6 +39,8 @@ type fakeNode struct {
 	added            config.Entry
 	hub              string
 	key              string
+	pairHub          string
+	pairName         string
 	force            bool
 	disabled         bool
 	err              error
@@ -113,6 +115,12 @@ func (f *fakeNode) SetKey(_ context.Context, key string) (nodectl.KeyResult, err
 	f.key = key
 	f.mu.Unlock()
 	return nodectl.KeyResult{Reloaded: f.reloaded}, f.record("setkey")
+}
+func (f *fakeNode) Pair(_ context.Context, hub, name string) (nodectl.PairResult, error) {
+	f.mu.Lock()
+	f.pairHub, f.pairName = hub, name
+	f.mu.Unlock()
+	return nodectl.PairResult{}, f.record("pair")
 }
 func (f *fakeNode) Reload(context.Context) error                 { return f.record("reload") }
 func (f *fakeNode) Restart(_ context.Context, name string) error { return f.record("restart:" + name) }
@@ -257,7 +265,7 @@ func TestWelcomeAndInit(t *testing.T) {
 	m, f := fixture(t, false)
 	f.snapshot.Config = nodectl.ConfigState{}
 	inspect(t, m)
-	contains(t, m.View().Content, "Welcome!", "/tmp/node.yaml", "n  create config", "not created yet")
+	contains(t, m.View().Content, "Welcome!", "/tmp/node.yaml", "p  pair with a hub", "n  create the config only", "not created yet")
 	m.Update(key("n"))
 	contains(t, m.View().Content, "Create config", "Searching", "Enter the URL manually")
 	m.Update(key("enter"))
@@ -859,5 +867,5 @@ func TestInitialInspectAndPeriodicPolling(t *testing.T) {
 	if f.count("inspect") != 2 || f.count("events") != 0 {
 		t.Fatal("stopped dashboard did not poll independently of events")
 	}
-	contains(t, m.View().Content, "n  create config")
+	contains(t, m.View().Content, "n  create the config only")
 }

@@ -4,12 +4,15 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/AldrinSalazar/mcp-mesh/internal/node/config"
 )
 
 const testKey = "mm_node_0123456789abcdefghijklmnop"
 
 func TestKeyRejectedCard(t *testing.T) {
 	m, f := fixture(t, true)
+	f.snapshot.Config.Key = config.KeySource{File: "/tmp/node.key"}
 	hub := &f.snapshot.Daemon.Status.Hub
 	hub.Connected = false
 	hub.KeyRejected, hub.KeyReason = true, "key revoked"
@@ -20,7 +23,7 @@ func TestKeyRejectedCard(t *testing.T) {
 		"● key rejected", "key revoked",
 		"The hub rejected this node's key: key revoked.",
 		"mcp-mesh-hub key create node work-pc", "mcp-mesh-node key set <key>",
-		"K hub key")
+		"p pair")
 	absent(t, view, "● retrying", "keeps retrying")
 
 	// An ordinary connection failure is still shown as retrying.
@@ -30,10 +33,17 @@ func TestKeyRejectedCard(t *testing.T) {
 	absent(t, m.View().Content, "key rejected")
 
 	// The narrow layout carries the state too.
-	hub.KeyRejected, hub.KeyReason = true, "no key set"
+	hub.KeyRejected, hub.KeyReason = true, "key revoked"
 	m.width = 80
 	inspect(t, m)
 	contains(t, m.View().Content, "key rejected")
+
+	// A machine without a key hasn't joined yet: pairing is the way in.
+	f.snapshot.Config.Key = config.KeySource{}
+	hub.KeyReason = "no key set"
+	inspect(t, m)
+	contains(t, m.View().Content, "not joined", "no key set · p pair", "Press p to pair")
+	absent(t, m.View().Content, "key rejected")
 }
 
 func TestKeyForm(t *testing.T) {

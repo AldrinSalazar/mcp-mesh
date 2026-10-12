@@ -30,6 +30,9 @@ func (m *model) stateHints() string {
 		}
 		return "enter create  esc cancel  ctrl+c quit"
 	}
+	if m.pairing {
+		return m.pairHints()
+	}
 	if m.help {
 		return "PgUp/PgDn scroll  ? close help  q quit"
 	}
@@ -46,7 +49,7 @@ type hintGroup struct {
 func (m *model) hintGroups() []hintGroup {
 	var node, mcps, view []string
 	if m.inspected && !m.snapshot.Config.Exists {
-		node = append(node, "n create config")
+		node = append(node, "p pair with a hub", "n create config")
 	}
 	if m.validConfig() && !m.snapshot.Daemon.Running {
 		node = append(node, "s start")
@@ -63,8 +66,9 @@ func (m *model) hintGroups() []hintGroup {
 	if m.snapshot.Config.Exists {
 		node = append(node, "e edit config")
 	}
-	if m.validConfig() {
-		node = append(node, "K hub key")
+	// Pairing is how a machine joins; K (a key made on the hub) is in ?.
+	if h := m.snapshot.Daemon.Status.Hub; m.validConfig() && !(m.snapshot.Daemon.Running && h.Connected) {
+		node = append(node, "p pair")
 	}
 	if m.validConfig() {
 		mcps = append(mcps, "a add")
@@ -180,10 +184,11 @@ func packHints(hints []string, width, maxLines int) []string {
 }
 
 func (m *model) helpLines() []string {
-	node := []string{m.bold("Node"), "s  Start node (valid config, stopped)", "S  Stop node (confirm)", "R  Apply config changes (restarts MCPs)", "i  Start at login (valid config, supported)", "U  Don't start at login (confirm; node stops)", "e  Edit config; R applies it", "K  Set the hub key (created on the hub for this node)", "n  Create config"}
+	node := []string{m.bold("Node"), "s  Start node (valid config, stopped)", "S  Stop node (confirm)", "R  Apply config changes (restarts MCPs)", "i  Start at login (valid config, supported)", "U  Don't start at login (confirm; node stops)", "e  Edit config; R applies it", "p  Pair with a hub: an admin approves it in the hub's dashboard"}
 	mcps := []string{m.bold("MCPs"), "a  Add MCP", "Connect shares an app’s localhost MCP through the hub.", "d  Enable/disable selected MCP", "x  Remove selected MCP (confirm)", "r  Restart enabled MCP (node running)", "↑/↓ or j/k  Select MCP"}
+	join := []string{m.bold("Other ways to join"), "K  Set a key made on the hub (scripted setups)", "n  Create the config only, then K"}
 	view := []string{m.bold("View"), "tab  Detail: logs → tools → info", "f  Toggle log follow", "PgUp/PgDn  Scroll detail", "? / esc  Close help", "q / ctrl+c  Quit", "the node keeps running"}
-	for _, group := range [][]string{node, mcps, view} {
+	for _, group := range [][]string{node, join, mcps, view} {
 		for i := 1; i < len(group); i++ {
 			key, description, ok := strings.Cut(group[i], "  ")
 			if ok {
@@ -195,9 +200,11 @@ func (m *model) helpLines() []string {
 	}
 	lines := []string{m.bold("Help"), "", "The node runs your MCPs and connects them to the hub. s runs it until you log out; i makes it start at every login.", ""}
 	width := max(1, min(96, m.width)-6)
+	left := append(node, "")
+	left = append(left, join...)
 	right := append(mcps, "")
 	right = append(right, view...)
-	for _, pair := range [][2][]string{{node, right}} {
+	for _, pair := range [][2][]string{{left, right}} {
 		if width >= 70 {
 			half := (width - 2) / 2
 			for i := 0; i < max(len(pair[0]), len(pair[1])); i++ {
