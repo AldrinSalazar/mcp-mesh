@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -53,6 +54,7 @@ func Run(ctx context.Context, node Node) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	m := newModel(ctx, node)
+	m.mouse = os.Getenv("MCPMESH_NO_MOUSE") != "1"
 	defer m.closeConnection()
 	defer m.cancelDiscovery()
 	_, err := tea.NewProgram(m, tea.WithContext(ctx)).Run()

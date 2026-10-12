@@ -52,6 +52,13 @@ func (m *model) handleKey(key string) tea.Cmd {
 		}
 	case "p":
 		return m.startPairing()
+	case "m":
+		m.mouse = !m.mouse
+		if m.mouse {
+			m.setNotice("mouse on · click and scroll; most terminals select text with Shift+drag", false)
+		} else {
+			m.setNotice("mouse off · the terminal selects text; m turns it back on", false)
+		}
 	case "K":
 		if m.validConfig() {
 			return m.openKeyForm()

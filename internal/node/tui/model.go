@@ -113,6 +113,8 @@ type model struct {
 	help                                           bool
 	pairing                                        bool // the pairing screen is open
 	pairFresh                                      bool // a snapshot came in since the request
+	mouse                                          bool // report clicks and the wheel (m toggles)
+	zones                                          []hit
 	helpOffset                                     int
 	form                                           *form
 	indicator                                      spinner.Model
@@ -122,7 +124,7 @@ type model struct {
 
 func newModel(ctx context.Context, node Node) *model {
 	return &model{ctx: ctx, node: node, viewport: viewport.New(viewport.WithWidth(80), viewport.WithHeight(10)),
-		indicator: spinner.New(spinner.WithSpinner(spinner.MiniDot)), follow: true, dark: true, width: 80, height: 24, now: time.Now()}
+		indicator: spinner.New(spinner.WithSpinner(spinner.MiniDot)), follow: true, dark: true, mouse: true, width: 80, height: 24, now: time.Now()}
 }
 
 func (m *model) Init() tea.Cmd {
@@ -523,6 +525,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return actionMsg{label: "config saved · press s to start the node"}
 		})
+	case tea.MouseClickMsg:
+		if msg.Button == tea.MouseLeft {
+			cmd = m.click(msg.X, msg.Y)
+		}
+	case tea.MouseWheelMsg:
+		if msg.Button == tea.MouseWheelUp || msg.Button == tea.MouseWheelDown {
+			cmd = m.wheel(msg.Button == tea.MouseWheelUp)
+		}
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" || (msg.String() == "q" && m.form == nil) {
 			m.closeConnection()

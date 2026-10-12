@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -127,7 +128,7 @@ func (m *model) pickerLines() []string {
 		if i == f.choice {
 			marker = m.accent("▌ ")
 		}
-		lines = append(lines, marker+text)
+		lines = append(lines, zone("pick:"+strconv.Itoa(i), marker+text))
 	}
 	if !f.searching && len(f.hubs) == 0 && f.discoveryError == "" {
 		lines = append(lines, m.dimWrap("No hubs found on this network (Docker bridge networks and VPNs like Tailscale don't carry discovery).", width)...)

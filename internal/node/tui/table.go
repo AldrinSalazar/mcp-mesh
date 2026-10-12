@@ -172,7 +172,7 @@ func (m *model) tableLines() []string {
 		if i == m.selected {
 			line += base.Render(strings.Repeat(" ", max(0, m.width-lipgloss.Width(line))))
 		}
-		lines = append(lines, line)
+		lines = append(lines, zone("row:"+strconv.Itoa(i), line))
 	}
 	return lines
 }

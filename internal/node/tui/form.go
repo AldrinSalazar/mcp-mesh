@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -360,15 +361,16 @@ func (m *model) formLines() []string {
 		if i == f.focus {
 			marker = m.accent("▌ ")
 		}
-		lines = append(lines, marker+m.dim(label))
+		id := "field:" + strconv.Itoa(i)
+		lines = append(lines, zone(id, marker+m.dim(label)))
 		if f.add && i == 2 {
 			start := "[eager]  lazy"
 			if f.lazy {
 				start = " eager  [lazy]"
 			}
-			lines = append(lines, "  "+start)
+			lines = append(lines, zone(id, "  "+start))
 		} else {
-			lines = append(lines, "  "+f.inputs[i].View())
+			lines = append(lines, zone(id, "  "+f.inputs[i].View()))
 		}
 	}
 	if f.err != "" {
@@ -428,9 +430,10 @@ func (m *model) kindPickerLines() []string {
 		if m.form.choice == i {
 			marker = m.accent("▌ ")
 		}
-		lines = append(lines, marker+item[0])
+		id := "pick:" + strconv.Itoa(i)
+		lines = append(lines, zone(id, marker+item[0]))
 		for _, line := range m.dimWrap(item[1], width) {
-			lines = append(lines, "  "+line)
+			lines = append(lines, zone(id, "  "+line))
 		}
 		lines = append(lines, "")
 	}
