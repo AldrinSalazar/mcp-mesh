@@ -15,7 +15,8 @@ brew install aldrinsalazar/tap/mcp-mesh-node
 
 To upgrade, run `brew upgrade mcp-mesh-node`. A running node keeps the old
 version until it restarts: run `mcp-mesh-node stop && mcp-mesh-node start`
-(also if it runs as a [service](#start-at-login-or-at-boot)).
+(also if it runs as a [service](#start-at-login-or-at-boot)). The node tells
+you when there is something to upgrade: see [Updates](#updates).
 
 Otherwise, download the archive for the machine from the
 [latest release](https://github.com/AldrinSalazar/mcp-mesh/releases/latest)
@@ -203,6 +204,9 @@ Each MCP has either `command` (launch) or `url` (connect):
 | `allow_tools` | the only tools the hub may see and call; omit for all |
 | `disabled` | keep the entry without serving it |
 
+At the top level, `log_level` is `debug`, `info` (default), `warn` or
+`error`.
+
 Values can use `${env:NAME}`. The node refuses to send its key over `ws://`
 to a host that isn't local (loopback, private or Tailscale addresses,
 `.local`/`.lan` names), and for the same reason won't pair over it; use
@@ -234,6 +238,35 @@ form field to choose it (click a chosen item again to take it); the wheel
 scrolls. Destructive actions still ask first. While the mouse is on, most
 terminals select text with Shift+drag (Option+drag in iTerm2); `m`
 turns it off and on, and `MCPMESH_NO_MOUSE=1` starts with it off.
+
+## Updates
+
+Once a day the running node asks GitHub's releases API whether a newer
+mcp-mesh release is out: one plain GET to `api.github.com`, which sends
+nothing about the machine. It keeps the answer in its state directory
+(`update.json`), so restarts don't ask again; offline or rate limited, it
+keeps the last answer and says nothing. Builds without a release version
+(`dev`) never ask, and nothing is upgraded on its own.
+
+When there is something to do, the dashboard's title bar shows
+`↑ <version> available`, and the dashboard, `mcp-mesh-node status` and
+the node's log say how to upgrade this install (`brew upgrade
+mcp-mesh-node`, or the download for this machine).
+`mcp-mesh-node --version` adds `(latest: <version>)`. They also say when:
+
+- the hub runs a newer version than the node (the hub sends its version
+  when the node connects; the hub's dashboard flags such nodes too);
+- the running node is older than the installed `mcp-mesh-node`: it was
+  upgraded, and keeps the old binary until it restarts
+  (`mcp-mesh-node stop && mcp-mesh-node start`, or **S** then **s** in the
+  dashboard).
+
+A hub that no longer accepts this node's protocol turns it away, and the
+node stops with a message that says to upgrade.
+
+A node that can't reach GitHub (offline, or GitHub is down) tries again
+an hour later and logs the failure only at debug level; nothing else
+changes.
 
 ## Platforms
 

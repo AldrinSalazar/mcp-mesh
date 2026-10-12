@@ -45,7 +45,7 @@ export function mockApi(mode: string): Plugin {
   const snapshot = (type: string): unknown =>
     ({
       nodes: st.nodes, tools: st.tools, prompts: st.prompts, resources: st.resources, calls: calls(), stats: stats(), keys: keyViews(), admins: st.admins,
-      groups: st.groups, approvals: st.approvals, settings: st.settings, overrides: st.overrides, pairings: pairingViews(),
+      groups: st.groups, approvals: st.approvals, settings: st.settings, overrides: st.overrides, pairings: pairingViews(), update: fx.update,
     })[type]
   const log = (action: string, target: string, detail = '') => {
     st.adminLog.unshift({ id: (st.adminLog[0]?.id ?? 0) + 1, time: new Date().toISOString(), actor: st.session || 'admin', action, target, detail, ip: '127.0.0.1' })
@@ -129,7 +129,7 @@ export function mockApi(mode: string): Plugin {
 
         if (path === '/events') {
           res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' })
-          const types = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'approvals', 'settings', 'overrides', ...(authOn ? ['keys', 'admins', 'groups', 'pairings'] : [])]
+          const types = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'approvals', 'settings', 'overrides', 'update', ...(authOn ? ['keys', 'admins', 'groups', 'pairings'] : [])]
           const send = (type: string) => {
             if (types.includes(type)) res.write(`event: ${type}\ndata: ${JSON.stringify(snapshot(type))}\n\n`)
           }
@@ -142,7 +142,7 @@ export function mockApi(mode: string): Plugin {
           })
           return
         }
-        if (m === 'GET' && ['/nodes', '/tools', '/prompts', '/resources', '/calls', '/stats', '/approvals', '/settings', '/overrides'].includes(path)) return json(res, 200, snapshot(path.slice(1)))
+        if (m === 'GET' && ['/nodes', '/tools', '/prompts', '/resources', '/calls', '/stats', '/approvals', '/settings', '/overrides', '/update'].includes(path)) return json(res, 200, snapshot(path.slice(1)))
         const ovPath = path.match(/^\/overrides\/([^/]+)\/([^/]+)\/(.+)$/)
         if (ovPath && (m === 'PUT' || m === 'DELETE')) {
           const [node, mcp, tool] = ovPath.slice(1).map(decodeURIComponent) as [string, string, string]

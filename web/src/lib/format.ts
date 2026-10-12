@@ -91,6 +91,12 @@ export function osLabel(os: string): string {
   }
 }
 
+// versionLabel shows a release version with one leading v, whether the
+// build reports "1.2.0" or "v1.2.0"; "dev" and empty stay as they are.
+export function versionLabel(v: string): string {
+  return /^v?\d/.test(v) ? `v${v.replace(/^v/, '')}` : v
+}
+
 // host drops the port from a remote address: "10.0.0.5:51234" → "10.0.0.5".
 export function host(addr: string): string {
   if (!addr) return ''

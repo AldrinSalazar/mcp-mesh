@@ -869,3 +869,16 @@ func TestInitialInspectAndPeriodicPolling(t *testing.T) {
 	}
 	contains(t, m.View().Content, "n  create the config only")
 }
+
+func TestUpdateNotices(t *testing.T) {
+	m, f := fixture(t, true)
+	absent(t, m.View().Content, "available", "Upgrade with", "still runs")
+	f.snapshot.Update = nodectl.UpdateState{Latest: "v2", URL: "https://example/v2", Upgrade: "brew upgrade mcp-mesh-node", Running: "v0.9"}
+	inspect(t, m)
+	contains(t, m.View().Content, "↑ v2 available · v1", "Update available: mcp-mesh-node v2. Upgrade with brew upgrade mcp-mesh-node, then restart the node (S, then s).",
+		"The node still runs v0.9. Restart it to use this v1 (S, then s).")
+	f.snapshot.Update = nodectl.UpdateState{Hub: "v3", Upgrade: "brew upgrade mcp-mesh-node"}
+	inspect(t, m)
+	contains(t, m.View().Content, "The hub runs v3, newer than this node. Upgrade with brew upgrade mcp-mesh-node")
+	absent(t, m.View().Content, "available")
+}

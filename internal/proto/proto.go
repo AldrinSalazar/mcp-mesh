@@ -117,6 +117,9 @@ type Welcome struct {
 	Version        int    `json:"version"`
 	NodeID         string `json:"nodeId"`
 	MaxMessageSize int64  `json:"maxMessageSize"`
+	// HubVersion is the hub's release version, for notices only; older hubs
+	// don't send it.
+	HubVersion string `json:"hubVersion,omitempty"`
 }
 
 // Pair is the first frame a node sends on PairPath: it has no key and asks

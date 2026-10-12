@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 )
 
 // ErrUnknownMCP is returned by Backend methods for an MCP name that is not
@@ -38,12 +40,17 @@ type Status struct {
 	ConfigChanged bool        `json:"configChanged,omitempty"`
 	Hub           HubStatus   `json:"hub"`
 	MCPs          []MCPStatus `json:"mcps"` // sorted by Name
+	// Update is what the daemon knows of newer releases.
+	Update update.Status `json:"update"`
 }
 
 // HubStatus is the daemon's connection to the hub.
 type HubStatus struct {
-	URL       string    `json:"url"`
-	Connected bool      `json:"connected"`
+	URL       string `json:"url"`
+	Connected bool   `json:"connected"`
+	// Version is the hub's release version, from its welcome; empty before
+	// the first connection, or for a hub too old to send it.
+	Version   string    `json:"version,omitempty"`
 	Since     time.Time `json:"since"` // when Connected last changed
 	LastError string    `json:"lastError,omitempty"`
 	// KeyRejected: the hub refused the node's key (or wants one); LastError

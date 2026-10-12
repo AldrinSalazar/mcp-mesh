@@ -6,6 +6,7 @@ import { useRoute } from 'vue-router'
 import SideNav from './SideNav.vue'
 import TopBar from './TopBar.vue'
 import ConnectionBanner from './ConnectionBanner.vue'
+import UpdateBanner from './UpdateBanner.vue'
 import GlobalDialogs from '@/components/dialogs/GlobalDialogs.vue'
 import UiNotice from '@/components/ui/UiNotice.vue'
 import { live, start } from '@/lib/live'
@@ -28,6 +29,7 @@ onMounted(start)
           <strong>Authentication is off: anyone who can reach this hub can use every tool.</strong>
         </UiNotice>
         <ConnectionBanner />
+        <UpdateBanner />
         <RouterView />
       </main>
     </div>

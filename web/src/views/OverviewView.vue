@@ -14,7 +14,7 @@ import MetricCard from '@/components/overview/MetricCard.vue'
 import AttentionPanel from '@/components/overview/AttentionPanel.vue'
 import RecentCalls from '@/components/overview/RecentCalls.vue'
 import ConnectGuide from '@/components/overview/ConnectGuide.vue'
-import { approvalItems, callsLine, groupsLine, metrics, nodesLine } from '@/components/overview/summary'
+import { approvalItems, callsLine, groupsLine, metrics, nodesLine, outdatedItems } from '@/components/overview/summary'
 
 const now = useNow()
 const router = useRouter()
@@ -23,7 +23,7 @@ const loaded = computed(() => live.loaded.nodes)
 const fresh = computed(() => loaded.value && live.nodes.length === 0)
 const m = computed(() => metrics(live.nodes, live.tools))
 const issues = computed(() => problems(live.nodes, live.info?.started_at, now.value))
-const waiting = computed(() => approvalItems(live.nodes, live.approvals, live.pairings))
+const waiting = computed(() => [...approvalItems(live.nodes, live.approvals, live.pairings), ...outdatedItems(live.nodes)])
 const calls = computed(() => callsLine(live.stats))
 const recent = computed(() => live.calls.slice(0, 5))
 const offline = computed(() => m.value.total - m.value.online)

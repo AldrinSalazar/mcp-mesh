@@ -51,7 +51,7 @@ Served on the hub's admin listener next to the dashboard. The dashboard SPA uses
 
 `state` is one of `opening`, `ready`, `idle`, `failed`, `closed`. Each MCP also has `prompts`, `resources` (resources and templates), `call_timeout_ms` (its own call timeout from node.yaml; `0` means the hub default) and `clients`: for `sharing: "per-client"` MCPs, how many clients have a process of their own right now. `problems` is an array of strings (`[]` when none): definitions the hub dropped from the MCP's last listing (invalid or oversized tools, for instance), and why. Offline nodes stay listed: the hub remembers every node that has connected (across restarts too), and lists one that isn't connected with `online: false`, `disconnected_at` as when it was last seen, and its MCPs as last listed (`state: "closed"`).
 
-Each node also has `"trust":{"level":"trust","explicit":false,"approved":true}` and `"pending_tools":0`. `level` is `trust` (every tool visible), `review` (new tools visible, a changed tool waits for approval) or `approve` (the node waits for approval, then every new or changed tool does). `explicit` is false when the node follows the hub default (`GET /settings`). `approved` matters for `approve`: until then none of the node's tools are visible. `pending_tools` counts its tools waiting for approval.
+Each node also has `"trust":{"level":"trust","explicit":false,"approved":true}` and `"pending_tools":0`. `level` is `trust` (every tool visible), `review` (new tools visible, a changed tool waits for approval) or `approve` (the node waits for approval, then every new or changed tool does). `explicit` is false when the node follows the hub default (`GET /settings`). `approved` matters for `approve`: until then none of the node's tools are visible. `pending_tools` counts its tools waiting for approval. `outdated` is true when the node runs an older version than the latest release, or, before the hub knows one, than the hub (see `GET /update`).
 
 `DELETE /nodes/{name}` forgets an offline node: it is no longer listed until it connects again. Its key, trust level and approvals stay. 204; 404 for a node the hub doesn't know; 409 while it is connected.
 
@@ -289,6 +289,17 @@ Who changed what: sign-ins (and failed attempts), keys, admin users, groups, tru
 
 `DELETE /admins/{username}`: 204; 404 for an unknown user; 409 for the last admin.
 
+### `GET /update`
+
+Whether a newer mcp-mesh release is out, from the hub's daily check.
+
+```json
+{"enabled":true,"version":"v1.2.0","latest":"v1.3.0","update_available":true,
+ "release_url":"https://github.com/AldrinSalazar/mcp-mesh/releases/tag/v1.3.0","checked_at":"2026-10-12T09:00:00Z"}
+```
+
+`enabled` is false for a build without a release version (`dev`), which never checks; `latest` is empty until a check succeeds, and `checked_at` is then omitted.
+
 ### `GET /events` (Server-Sent Events)
 
 `Content-Type: text/event-stream`. On connect, one event per type carrying the current snapshot, then one more whenever that snapshot changes. `data` is a single line holding the same JSON the matching GET returns.
@@ -301,6 +312,6 @@ event: calls
 data: [...]
 ```
 
-Types: `nodes`, `tools`, `prompts`, `resources`, `calls`, `stats`, `approvals`, `settings`, `overrides`, and when auth is on `keys`, `admins`, `groups` and `pairings`. The hub checks for changes about once a second (`calls` therefore shows the most recent ~N calls, as `GET /calls` does). A comment line `: ping` is sent every 25 seconds to keep the connection alive.
+Types: `nodes`, `tools`, `prompts`, `resources`, `calls`, `stats`, `approvals`, `settings`, `update`, `overrides`, and when auth is on `keys`, `admins`, `groups` and `pairings`. The hub checks for changes about once a second (`calls` therefore shows the most recent ~N calls, as `GET /calls` does). A comment line `: ping` is sent every 25 seconds to keep the connection alive.
 
 A client that falls too far behind is disconnected rather than slowing the others; `EventSource` reconnects by itself and receives a full snapshot again. The same happens when the hub restarts. The stream needs the session cookie like any other endpoint; if the session ends, reconnection gets 401 and the client should show sign-in.

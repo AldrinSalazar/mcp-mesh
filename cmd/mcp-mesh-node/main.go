@@ -16,6 +16,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/daemon"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/paths"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/service"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +33,7 @@ func rootCmd() *cobra.Command {
 	var noInput bool
 	defaultConfig, configErr := paths.ConfigFile()
 	defaultSocket, socketErr := paths.SocketPath()
-	root := &cobra.Command{Use: "mcp-mesh-node", Short: "Manage MCP servers connected to an mcp-mesh hub", Version: version, SilenceUsage: true, Args: cobra.NoArgs,
+	root := &cobra.Command{Use: "mcp-mesh-node", Short: "Manage MCP servers connected to an mcp-mesh hub", Version: version + latestNote(), SilenceUsage: true, Args: cobra.NoArgs,
 		Long:    "Manage this machine’s MCP servers through one hub connection.\n\nGetting started:\n  mcp-mesh-node                      open the dashboard (does everything below)\n  mcp-mesh-node init --hub ws://HUB:7001/node\n  mcp-mesh-node add -- npx -y @modelcontextprotocol/server-filesystem ~/code\n  mcp-mesh-node add --name blender --url http://127.0.0.1:9876/mcp\n                                     connect to an app’s MCP and share it through the hub\n  mcp-mesh-node start                start the node now, until logout;\n                                     without a key it asks the hub to pair\n  mcp-mesh-node install              start it now and at every login",
 		Example: "  mcp-mesh-node",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -80,9 +81,13 @@ func rootCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		updates, err := paths.UpdateFile()
+		if err != nil {
+			return err
+		}
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		return daemon.Run(ctx, daemon.Options{ConfigPath: configPath, SocketPath: socketPath, EnvFile: env, ToolCacheDir: cache, Version: version})
+		return daemon.Run(ctx, daemon.Options{ConfigPath: configPath, SocketPath: socketPath, EnvFile: env, ToolCacheDir: cache, UpdateFile: updates, Version: version})
 	})
 	var hub, initKey, initName string
 	var force bool
@@ -280,6 +285,21 @@ func rootCmd() *cobra.Command {
 	commandHelp(root)
 	return root
 }
+
+// latestNote is " (latest: v1.3.0)" when the node's last check found a
+// newer release, for --version.
+func latestNote() string {
+	file, err := paths.UpdateFile()
+	if err != nil {
+		return ""
+	}
+	cached, _ := update.FileCache{Path: file}.Load(context.Background())
+	if st := update.StatusOf(version, cached); st.Available {
+		return " (latest: " + st.Latest + ")"
+	}
+	return ""
+}
+
 func refreshEnv(ctx context.Context) error {
 	env, err := service.CaptureLoginEnv(ctx)
 	if err != nil {

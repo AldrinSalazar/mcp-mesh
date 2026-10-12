@@ -129,7 +129,7 @@ func (n *node) serve(version int) {
 	}()
 	n.r.opts.Logger.Info("node connected", "node", n.info.Name, "addr", n.info.RemoteAddr, "version", n.info.NodeVersion, "protocol", version, "os", n.info.OS, "mcps", len(n.info.MCPs))
 	if err := n.conn.Send(n.ctx, &proto.Envelope{T: proto.TWelcome, Welcome: &proto.Welcome{
-		Version: version, NodeID: randomID("n_"), MaxMessageSize: n.r.opts.MaxMessageSize,
+		Version: version, NodeID: randomID("n_"), MaxMessageSize: n.r.opts.MaxMessageSize, HubVersion: n.r.opts.Version,
 	}}); err != nil {
 		return
 	}

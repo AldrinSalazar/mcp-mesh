@@ -25,6 +25,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/toolfilter"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/upstream"
 	"github.com/AldrinSalazar/mcp-mesh/internal/proto"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -34,7 +35,10 @@ type Options struct {
 	EnvFile      string
 	ToolCacheDir string
 	Version      string
-	Logger       *slog.Logger
+	// UpdateFile caches the check for newer releases; empty keeps the
+	// answer in memory only.
+	UpdateFile string
+	Logger     *slog.Logger
 	// DrainTimeout bounds how long a reload that reconnects to the hub waits
 	// for calls in progress to finish; zero means a minute.
 	DrainTimeout time.Duration
@@ -98,6 +102,7 @@ type backend struct {
 	inFlight atomic.Int64
 	// loadedHash is the SHA-256 of node.yaml as last loaded; guarded by mu.
 	loadedHash [32]byte
+	updates    *update.Checker
 }
 
 // Run runs the daemon until ctx ends or the control API requests shutdown.
@@ -134,6 +139,18 @@ func Run(ctx context.Context, opts Options) error {
 	d := &backend{opts: opts, ctx: ownerCtx, cfg: cfg, level: level, logger: logger, started: time.Now(), subscribers: make(map[chan control.Event]struct{}), failed: make(chan error, 1), shutdown: make(chan struct{}, 1)}
 	hup, stopSignals := reloadSignals()
 	defer stopSignals()
+	var updateCache update.Cache
+	if opts.UpdateFile != "" {
+		updateCache = update.FileCache{Path: opts.UpdateFile}
+	}
+	d.updates = update.New(update.Options{
+		Current: opts.Version, Cache: updateCache, Logger: logger.With("component", "update"),
+		Upgrade:  update.NodeUpgrade(update.Executable()),
+		OnChange: func(update.Status) { d.publish(control.Event{Kind: control.EventStatus}) },
+	})
+	updatesDone := make(chan struct{})
+	go func() { defer close(updatesDone); d.updates.Run(ownerCtx) }()
+	defer func() { <-updatesDone }()
 	d.start(cfg)
 	d.noteLoaded()
 	serverCtx, cancelServer := context.WithCancel(ownerCtx)
@@ -252,7 +269,7 @@ func (d *backend) start(cfg *config.Config) {
 		defer close(rt.agentDone)
 		hostname, _ := os.Hostname()
 		pairing := &agent.Pairing{Hostname: hostname, OnCode: d.pairCode, Save: d.savePaired, Refused: cfg.Hub.CheckKeyTransport()}
-		err := agent.Run(agentCtx, agent.Config{HubURL: cfg.Hub.URL, Node: cfg.NodeName, Version: d.opts.Version, Header: cfg.Hub.Header, MCPs: mcps, Logger: d.logger, OnConnState: d.connectionState, InFlight: &d.inFlight, Pairing: pairing})
+		err := agent.Run(agentCtx, agent.Config{HubURL: cfg.Hub.URL, Node: cfg.NodeName, Version: d.opts.Version, Header: cfg.Hub.Header, MCPs: mcps, Logger: d.logger, OnConnState: d.connectionState, OnWelcome: d.welcomed, InFlight: &d.inFlight, Pairing: pairing})
 		d.connectionState(false, err)
 		if err != nil && agentCtx.Err() == nil {
 			select {
@@ -269,6 +286,15 @@ func (d *backend) stop() {
 	<-d.current.agentDone
 	d.current.supervisorsCancel()
 	d.current.supervisors.Wait()
+}
+
+func (d *backend) welcomed(w proto.Welcome) {
+	d.mu.Lock()
+	d.hub.Version = w.HubVersion
+	d.mu.Unlock()
+	if update.Behind(d.opts.Version, w.HubVersion) {
+		d.logger.Info("this node is older than the hub; upgrade mcp-mesh-node", "node_version", d.opts.Version, "hub_version", w.HubVersion, "upgrade", update.NodeUpgrade(update.Executable()))
+	}
 }
 
 func (d *backend) connectionState(connected bool, err error) {
@@ -348,7 +374,7 @@ func (d *backend) savePaired(node, key string) error {
 func (d *backend) Status() control.Status {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	status := control.Status{Node: d.cfg.NodeName, Version: d.opts.Version, PID: os.Getpid(), StartedAt: d.started, ConfigPath: d.cfg.Path, Hub: d.hub, MCPs: make([]control.MCPStatus, 0, len(d.supervisors))}
+	status := control.Status{Node: d.cfg.NodeName, Version: d.opts.Version, PID: os.Getpid(), StartedAt: d.started, ConfigPath: d.cfg.Path, Hub: d.hub, MCPs: make([]control.MCPStatus, 0, len(d.supervisors)), Update: d.updates.Status()}
 	if current, err := fileHash(d.opts.ConfigPath); err == nil {
 		status.ConfigChanged = current != d.loadedHash
 	}

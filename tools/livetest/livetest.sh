@@ -241,6 +241,8 @@ if api_login; then pass "API sign-in returns a CSRF token"; else fail "API sign-
 expect_ok "API lists the node's MCPs" "^200[^$]*" api GET /nodes
 expect_ok "API node list names the node and its key" '"name":"livetest".*"key_id":"k_' api GET /nodes
 expect_ok "API tools list has the launch MCP" "livetest__cli__render" api GET /tools
+expect_ok "a dev build doesn't ask GitHub for releases" '"enabled":false,"version":"dev"' api GET /update
+expect_ok "the node isn't flagged as outdated" '"name":"livetest".*"outdated":false' api GET /nodes
 expect_ok "API says which definitions were dropped and why" '"name":"bad"[^}]*"problems":\["tool \\"no_schema\\" dropped: [^]]*missing input schema' api GET /nodes
 expect_ok "audit log has the earlier calls" '"tool":"livetest__cli__render".*"outcome":"ok"' api GET '/audit?tool=livetest__cli__render'
 expect_ok "stats count the last hour's calls" '"calls_last_hour":[1-9][0-9]*,' api GET /stats

@@ -26,6 +26,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/control"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/paths"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/service"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 )
 
 var captureLoginEnv = service.CaptureLoginEnv
@@ -55,6 +56,22 @@ type Snapshot struct {
 	Config     ConfigState
 	Daemon     DaemonState
 	Service    ServiceState
+	Update     UpdateState
+}
+
+// UpdateState says what to tell the user about versions. Every field is
+// empty when there is nothing to say.
+type UpdateState struct {
+	// Latest is the newest release, when it is newer than this binary; URL
+	// is its page.
+	Latest, URL string
+	// Upgrade is how to upgrade this install.
+	Upgrade string
+	// Running is the running node's version when it is older than this
+	// binary: it was upgraded and not restarted.
+	Running string
+	// Hub is the hub's version when it is newer than the running node.
+	Hub string
 }
 
 type ConfigState struct {
@@ -210,7 +227,32 @@ func (n *Node) Inspect(ctx context.Context) Snapshot {
 		}
 	}()
 	wg.Wait()
+	result.Update = n.updateState(ctx, result)
 	return result
+}
+
+// updateState compares this binary with the last known release (the
+// daemon's check keeps it), the running node and its hub.
+func (n *Node) updateState(ctx context.Context, s Snapshot) UpdateState {
+	var u UpdateState
+	cached, _ := update.FileCache{Path: filepath.Join(n.opts.StateDir, paths.UpdateFileName)}.Load(ctx)
+	if st := update.StatusOf(n.opts.Version, cached); st.Available {
+		u.Latest, u.URL = st.Latest, st.URL
+	}
+	running := n.opts.Version
+	if s.Daemon.Running {
+		running = s.Daemon.Status.Version
+		if update.Behind(running, n.opts.Version) {
+			u.Running = running
+		}
+		if hub := s.Daemon.Status.Hub.Version; update.Behind(running, hub) {
+			u.Hub = hub
+		}
+	}
+	if u.Latest != "" || u.Hub != "" {
+		u.Upgrade = update.NodeUpgrade(n.opts.Executable)
+	}
+	return u
 }
 
 // InitConfig writes a starter config pointing at hubURL ("" keeps the example URL).

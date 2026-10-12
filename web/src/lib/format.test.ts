@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, duration, host, percent, shortID, span } from './format'
+import { ago, duration, host, percent, shortID, span, versionLabel } from './format'
 
 describe('format', () => {
   it.each([
@@ -35,5 +35,14 @@ describe('format', () => {
     expect(shortID('k_n8d2a1b3')).toBe('k_n8d2…')
     expect(percent(125, 128)).toBe('97.7%')
     expect(percent(0, 0)).toBe('100%')
+  })
+})
+
+describe('versionLabel', () => {
+  it('shows one leading v', () => {
+    expect(versionLabel('1.2.0')).toBe('v1.2.0')
+    expect(versionLabel('v1.2.0-3-gabc1234')).toBe('v1.2.0-3-gabc1234')
+    expect(versionLabel('dev')).toBe('dev')
+    expect(versionLabel('')).toBe('')
   })
 })

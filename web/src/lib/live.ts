@@ -3,11 +3,11 @@
 // never polls. The session (and whether auth is on) lives here too.
 import { reactive, ref, onScopeDispose, getCurrentScope } from 'vue'
 import { api, setCSRF, setUnauthorizedHandler } from './api'
-import type { Admin, Call, Group, Info, Key, Node, PairingRequest, PendingTool, Prompt, ResourceItem, Settings, Stats, Tool, ToolOverride } from './types'
+import type { Admin, Call, Group, Info, Key, Node, PairingRequest, PendingTool, Prompt, ResourceItem, Settings, Stats, Tool, ToolOverride, UpdateInfo } from './types'
 
 export type Connection = 'connecting' | 'live' | 'reconnecting'
 
-type Kind = 'nodes' | 'tools' | 'prompts' | 'resources' | 'calls' | 'stats' | 'keys' | 'admins' | 'groups' | 'approvals' | 'pairings' | 'settings' | 'overrides'
+type Kind = 'nodes' | 'tools' | 'prompts' | 'resources' | 'calls' | 'stats' | 'keys' | 'admins' | 'groups' | 'approvals' | 'pairings' | 'settings' | 'overrides' | 'update'
 
 const state = reactive({
   info: null as Info | null,
@@ -32,10 +32,12 @@ const state = reactive({
   pairings: [] as PairingRequest[],
   settings: null as Settings | null,
   overrides: [] as ToolOverride[],
+  // update: whether a newer mcp-mesh release is out.
+  update: null as UpdateInfo | null,
   // loaded says which lists have arrived at least once, for loading states.
   loaded: {
     nodes: false, tools: false, prompts: false, resources: false, calls: false, stats: false, keys: false, admins: false,
-    groups: false, approvals: false, pairings: false, settings: false, overrides: false,
+    groups: false, approvals: false, pairings: false, settings: false, overrides: false, update: false,
   } as Record<Kind, boolean>,
 })
 
@@ -151,10 +153,11 @@ function clearData() {
   state.pairings = []
   state.settings = null
   state.overrides = []
+  state.update = null
   for (const k of Object.keys(state.loaded) as Kind[]) state.loaded[k] = false
 }
 
-const kinds: Kind[] = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'keys', 'admins', 'groups', 'approvals', 'pairings', 'settings', 'overrides']
+const kinds: Kind[] = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'keys', 'admins', 'groups', 'approvals', 'pairings', 'settings', 'overrides', 'update']
 
 // start opens the events stream. Safe to call again; it keeps one stream.
 export function start(): void {
@@ -251,6 +254,7 @@ function fetchKind(kind: Kind): Promise<unknown> {
     case 'resources': return api.resources()
     case 'overrides': return api.overrides()
     case 'settings': return api.settings()
+    case 'update': return api.update()
     default: return Promise.reject(new Error(`no REST list for ${kind}`))
   }
 }

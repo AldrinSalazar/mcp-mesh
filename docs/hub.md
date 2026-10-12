@@ -165,6 +165,30 @@ Every flag also reads an environment variable.
 | `--mdns`, `--name` | `MCPMESH_MDNS`, `MCPMESH_NAME` | `true`, hostname | LAN announcement |
 | `--log-level`, `--log-format` | `MCPMESH_LOG_LEVEL`, `MCPMESH_LOG_FORMAT` | `info`, `text` | logging |
 
+## Updates
+
+Once a day the hub asks GitHub's releases API whether a newer mcp-mesh
+release is out: one plain GET to `api.github.com`, which sends nothing
+about the hub. The answer is kept in the database, so a restart doesn't
+ask again; offline or rate limited, the hub keeps the last answer and
+says nothing. Builds without a release version (`dev`) never ask.
+
+When a newer release is out, the dashboard shows a banner with the release
+notes and the upgrade command, until an admin dismisses it for that
+release. To upgrade a hub run with Compose:
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+The Nodes page marks nodes that run an older version than the latest
+release (or than the hub itself, before the hub knows the latest), and
+Overview counts them under Needs attention. Nothing is upgraded on its own.
+
+A hub that can't reach GitHub (air-gapped, or GitHub is down) tries again
+an hour later and logs the failure only at debug level. Until a check
+succeeds, nodes are compared with the hub's own version.
+
 ## Backup
 
 All of the hub's state is in its data directory, the volume on `/data`.

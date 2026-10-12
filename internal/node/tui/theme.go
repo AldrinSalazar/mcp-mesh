@@ -30,6 +30,9 @@ func (m *model) green(s string) string { return lipgloss.NewStyle().Foreground(m
 func (m *model) red(s string) string {
 	return lipgloss.NewStyle().Foreground(m.theme().error).Render(s)
 }
+func (m *model) warn(s string) string {
+	return lipgloss.NewStyle().Foreground(m.theme().warn).Render(s)
+}
 func (m *model) dim(s string) string {
 	return lipgloss.NewStyle().Foreground(m.theme().muted).Faint(true).Render(s)
 }

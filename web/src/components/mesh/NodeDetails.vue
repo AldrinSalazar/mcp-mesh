@@ -5,7 +5,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiNotice from '@/components/ui/UiNotice.vue'
-import { host, osLabel, plural, since } from '@/lib/format'
+import { host, osLabel, plural, since, versionLabel } from '@/lib/format'
 import { live } from '@/lib/live'
 import { mcpStatus, nodeStatus } from '@/lib/status'
 import { trustLabel } from '@/lib/trust'
@@ -36,7 +36,7 @@ function cap(s: string): string {
     <dl class="facts">
       <div><dt>OS</dt><dd>{{ osLabel(node.os) }}</dd></div>
       <div><dt>Address</dt><dd class="mono">{{ host(node.remote_addr) || '-' }}</dd></div>
-      <div><dt>Node version</dt><dd>v{{ node.node_version }}</dd></div>
+      <div><dt>Node version</dt><dd>{{ versionLabel(node.node_version) }}<UiBadge v-if="node.outdated" tone="info" class="upd">Update available</UiBadge></dd></div>
       <div><dt>Trust level</dt><dd>{{ trustLabel(node.trust.level) }}</dd></div>
       <div v-if="node.pending_tools > 0 || !node.trust.approved">
         <dt>Approval</dt>
@@ -77,6 +77,7 @@ function cap(s: string): string {
 .facts div { display: grid; grid-template-columns: 116px 1fr; align-items: center; height: 43px; font-size: 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
+.upd { margin-left: 10px; }
 .warnlink { color: var(--warn); font-weight: 500; }
 .facts dd.mono { font-size: 13px; }
 .section-title { margin-bottom: 14px; }
