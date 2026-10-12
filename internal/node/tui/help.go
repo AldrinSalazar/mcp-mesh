@@ -137,7 +137,7 @@ func (m *model) footerLines(width, maxLines int) []string {
 		for _, hint := range g.hints {
 			if hint != "? help" && hint != "q quit" {
 				key, _, _ := strings.Cut(hint, " ")
-				keys = append(keys, m.accent(key))
+				keys = append(keys, zone("key:"+hintKey(hint), m.accent(key)))
 			}
 		}
 	}
@@ -149,7 +149,7 @@ func (m *model) styledHints(hints []string) []string {
 	styled := make([]string, len(hints))
 	for i, hint := range hints {
 		key, desc, _ := strings.Cut(hint, " ")
-		styled[i] = m.accent(key) + " " + m.dim(desc)
+		styled[i] = zone("key:"+hintKey(hint), m.accent(key)+" "+m.dim(desc))
 	}
 	return styled
 }
@@ -187,7 +187,7 @@ func (m *model) helpLines() []string {
 	node := []string{m.bold("Node"), "s  Start node (valid config, stopped)", "S  Stop node (confirm)", "R  Apply config changes (restarts MCPs)", "i  Start at login (valid config, supported)", "U  Don't start at login (confirm; node stops)", "e  Edit config; R applies it", "p  Pair with a hub: an admin approves it in the hub's dashboard"}
 	mcps := []string{m.bold("MCPs"), "a  Add MCP", "Connect shares an app’s localhost MCP through the hub.", "d  Enable/disable selected MCP", "x  Remove selected MCP (confirm)", "r  Restart enabled MCP (node running)", "↑/↓ or j/k  Select MCP"}
 	join := []string{m.bold("Other ways to join"), "K  Set a key made on the hub (scripted setups)", "n  Create the config only, then K"}
-	view := []string{m.bold("View"), "tab  Detail: logs → tools → info", "f  Toggle log follow", "PgUp/PgDn  Scroll detail", "? / esc  Close help", "q / ctrl+c  Quit", "the node keeps running"}
+	view := []string{m.bold("View"), "tab  Detail: logs → tools → info", "f  Toggle log follow", "m  Mouse on/off (off: the terminal selects text)", "PgUp/PgDn  Scroll detail", "? / esc  Close help", "q / ctrl+c  Quit", "the node keeps running"}
 	for _, group := range [][]string{node, join, mcps, view} {
 		for i := 1; i < len(group); i++ {
 			key, description, ok := strings.Cut(group[i], "  ")

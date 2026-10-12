@@ -123,6 +123,7 @@ func (m *model) detailTitle() string {
 		} else {
 			tabs[i] = m.dim(tab)
 		}
+		tabs[i] = zone("tab:"+strconv.Itoa(i), tabs[i])
 	}
 	left := strings.Join(tabs, " ─ ")
 	r, _ := m.selectedMCP()

@@ -32,7 +32,7 @@ func (m *model) View() tea.View {
 	case m.confirm != "":
 		content = m.modal(m.confirmLines(), min(76, m.width))
 	case m.inspected && !m.snapshot.Config.Exists:
-		lines := []string{m.badge(), "", "Welcome! This node shares your MCP servers with agents through one hub.", m.dim(singleLine(homePath(m.snapshot.ConfigPath))), m.dim("Config not created yet"), "", m.accent("p  pair with a hub") + m.dim("  pick the hub; an admin approves this machine there"), m.dim("n  create the config only, to use a key made on the hub")}
+		lines := []string{m.badge(), "", "Welcome! This node shares your MCP servers with agents through one hub.", m.dim(singleLine(homePath(m.snapshot.ConfigPath))), m.dim("Config not created yet"), "", zone("key:p", m.accent("p  pair with a hub")+m.dim("  pick the hub; an admin approves this machine there")), zone("key:n", m.dim("n  create the config only, to use a key made on the hub"))}
 		if m.notice != "" {
 			lines = append(lines, m.noticeLine())
 		}
@@ -58,7 +58,11 @@ func (m *model) View() tea.View {
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], m.width, "…")
 	}
+	m.zones = scanZones(lines)
 	v := tea.NewView(strings.Join(lines, "\n"))
 	v.AltScreen = true
+	if m.mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	return v
 }

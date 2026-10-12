@@ -228,6 +228,13 @@ private.
 
 Scripts can pass `--no-input` (or `MCPMESH_NO_INPUT=1`) to disable prompts.
 
+The dashboard takes the mouse too: click an MCP to select it, a detail tab
+to switch to it, any shortcut in the bottom bar to run it, and a hub or a
+form field to choose it (click a chosen item again to take it); the wheel
+scrolls. Destructive actions still ask first. While the mouse is on, most
+terminals select text with Shift+drag (Option+drag in iTerm2); `m`
+turns it off and on, and `MCPMESH_NO_MOUSE=1` starts with it off.
+
 ## Platforms
 
 Linux and macOS. Windows can run `wrap` in the foreground; the background
