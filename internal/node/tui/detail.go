@@ -144,7 +144,7 @@ func (m *model) resizeDetail() {
 		m.viewport.SetWidth(width)
 		m.setDetail()
 	}
-	m.viewport.SetHeight(max(0, m.height-len(m.topLines())-4-len(m.noticeLines())))
+	m.viewport.SetHeight(max(0, m.height-len(m.topLines())-3-len(m.noticeLines())-len(m.footerLines(m.width, m.footerBudget()))))
 	if m.follow && m.tab == 0 {
 		m.viewport.GotoBottom()
 	}

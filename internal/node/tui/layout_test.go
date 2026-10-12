@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -109,6 +110,74 @@ func TestCardWidthsAndPathTail(t *testing.T) {
 			if strings.Count(ansi.Strip(lines[2]), "╭") != 3 {
 				t.Fatal("expected three cards in one row")
 			}
+		}
+	}
+}
+
+func TestFooterFitsSmallTerminals(t *testing.T) {
+	for _, size := range [][2]int{{140, 40}, {100, 30}, {80, 24}, {60, 20}, {40, 15}, {30, 10}, {20, 4}} {
+		for _, running := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%dx%d running=%v", size[0], size[1], running), func(t *testing.T) {
+				m, _ := fixture(t, running)
+				m.width, m.height = size[0], size[1]
+				m.resizeDetail()
+				view := strings.Split(ansi.Strip(m.View().Content), "\n")
+				if len(view) > m.height {
+					t.Fatalf("%d lines in a %d-line terminal", len(view), m.height)
+				}
+				for _, line := range view {
+					if ansi.StringWidth(line) > m.width {
+						t.Fatalf("line wider than %d: %q", m.width, line)
+					}
+				}
+				footer := m.footerLines(m.width, m.footerBudget())
+				if len(footer) > m.footerBudget() {
+					t.Fatalf("footer takes %d lines, budget %d", len(footer), m.footerBudget())
+				}
+				// The footer is the bottom of the screen, not what gives way.
+				if got, want := strings.Join(view[len(view)-len(footer):], "\n"), ansi.Strip(strings.Join(footer, "\n")); got != want {
+					t.Fatalf("screen ends with\n%s\nwant footer\n%s", got, want)
+				}
+				text := ansi.Strip(strings.Join(footer, "\n"))
+				contains(t, text, "? help", "q quit")
+				if strings.Contains(text, "…") {
+					t.Fatalf("a hint was cut:\n%s", text)
+				}
+				// Each hint is whole on one line. Compact, only keys show, and
+				// a full footer may drop some: ? lists them all.
+				compact := !strings.Contains(text, "View")
+				if compact && len(footer) == m.footerBudget() {
+					return
+				}
+				for _, g := range m.hintGroups() {
+					for _, hint := range g.hints {
+						key, _, _ := strings.Cut(hint, " ")
+						if !strings.Contains(text, hint) && !(compact && strings.Contains(text, key)) {
+							t.Errorf("hint %q missing from footer:\n%s", hint, text)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestModalFooterWrapsBetweenHints(t *testing.T) {
+	m, _ := fixture(t, false)
+	m.width, m.height = 40, 24
+	m.Update(key("a"))
+	m.Update(key("enter"))
+	if m.form == nil || !m.form.add {
+		t.Fatal("add form not open")
+	}
+	view := ansi.Strip(m.View().Content)
+	for _, hint := range []string{"tab/shift+tab field", "space/←→ start", "enter/ctrl+s save", "esc back"} {
+		found := false
+		for line := range strings.SplitSeq(view, "\n") {
+			found = found || strings.Contains(line, hint)
+		}
+		if !found {
+			t.Errorf("hint %q split or missing:\n%s", hint, view)
 		}
 	}
 }
