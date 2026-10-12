@@ -67,6 +67,21 @@ export const nodes: Node[] = [
 ]
 
 const describe: Record<string, [string, unknown]> = {
+  // A long structured description, as Autodesk Fusion's MCP writes them.
+  'workstation__blender__execute_python': [[
+    'Execute operations in the active Blender scene. This tool provides the Execute operation, with a dispatcher that routes to specific handlers.',
+    '=== FEATURE TYPES ===',
+    'script:',
+    '- Runs a Python snippet in the scene → returns its printed output',
+    '- Invoke when the user asks to automate the scene; do not invoke for general how-to questions',
+    'Required parameters:',
+    '- featureType: `"script"` (required)',
+    '- object: (required) { code: the Python source }',
+    '=== BEFORE CALLING ===',
+    '- Call get_scene_info first, and describe the change in plain language',
+    '- Wait for explicit consent before running code that deletes objects',
+    '  - Undo is available with the update tool',
+  ].join('\n'), { type: 'object', properties: { featureType: { type: 'string' }, object: { type: 'object' } }, required: ['featureType', 'object'] }],
   'workstation__blender__render': ['Render the active Blender scene to an image. Use the current camera and render settings, or choose an output format.', {
     type: 'object',
     properties: {

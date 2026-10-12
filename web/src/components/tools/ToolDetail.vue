@@ -11,6 +11,7 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiNotice from '@/components/ui/UiNotice.vue'
 import { approvalBadges } from '@/lib/trust'
+import RichText from '@/components/ui/RichText.vue'
 import EditToolDialog from './EditToolDialog.vue'
 import { paramLine, parameters } from './schema'
 
@@ -60,7 +61,8 @@ async function copy() {
     <UiNotice v-if="tool.approval !== 'approved'" tone="warn" class="unapproved">
       Clients can't see this tool until it's approved. <RouterLink to="/approvals" class="arrow-link">Review in Approvals</RouterLink>
     </UiNotice>
-    <p class="text">{{ tool.description_override || tool.description || 'No description.' }}</p>
+    <RichText v-if="tool.description_override || tool.description" class="text" :text="tool.description_override || tool.description" />
+    <p v-else class="text muted">No description.</p>
     <p v-if="tool.description_override" class="edited muted">Description edited. The MCP's own is shown in the editor.</p>
 
     <section class="sec">

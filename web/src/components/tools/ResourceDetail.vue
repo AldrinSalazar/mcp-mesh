@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RichText from '@/components/ui/RichText.vue'
 import type { ResourceItem } from '@/lib/types'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import ItemDetail from './ItemDetail.vue'
@@ -10,7 +11,8 @@ defineEmits<{ close: [] }>()
 <template>
   <ItemDetail kind="Resource" :title="resource.name || resource.original_uri" :copy-value="resource.uri" copy-label="Copy exposed URI" @close="$emit('close')">
     <div v-if="resource.template" class="badges"><UiBadge tone="info">Template</UiBadge></div>
-    <p class="text">{{ resource.description || 'No description.' }}</p>
+    <RichText v-if="resource.description" class="text" :text="resource.description" />
+    <p v-else class="text muted">No description.</p>
     <section class="sec">
       <span class="label">Exposed URI</span>
       <p class="mono val">{{ resource.uri }}</p>
