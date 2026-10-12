@@ -64,7 +64,7 @@ const pairs = computed(() => !props.authOff && props.pairing)
         <span class="num mono">03</span>
         <div>
           <h3>Connect your agent</h3>
-          <p>{{ authOff ? 'Add the MCP URL below to Claude Code.' : 'Create a client key and add the MCP URL to Claude Code.' }}</p>
+          <p>{{ authOff ? 'Add the MCP URL below to your agent.' : 'Create a client key and add the MCP URL to your agent.' }} <RouterLink to="/connect" class="arrow-link">Setup for Claude Code, Codex, OpenCode and more</RouterLink></p>
         </div>
       </li>
     </ol>

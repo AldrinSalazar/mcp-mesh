@@ -143,6 +143,22 @@ test('signing out ends the session', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in/)
 })
 
+test('Connect shows how to add a machine and each client', async ({ page }) => {
+  await signIn(page)
+  await page.getByRole('link', { name: 'Connect' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Connect', level: 1 })).toBeVisible()
+  await expect(page.locator('code', { hasText: 'mcp-mesh-node init --hub wss://mesh.home-lab.local/node && mcp-mesh-node start' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Linux / macOS' }).click()
+  await expect(page.locator('code', { hasText: 'releases/latest/download' })).toBeVisible()
+  await page.getByRole('button', { name: 'Codex' }).click()
+  const codex = page.getByRole('region', { name: 'Codex' })
+  await expect(codex).toContainText('[mcp_servers.mcp-mesh]')
+  await expect(codex).toContainText('"Authorization" = "Bearer <client-key>"')
+  await expect(page.getByRole('region', { name: 'Claude Code' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'OpenCode' }).click()
+  await expect(page.getByRole('region', { name: 'OpenCode' })).toContainText('"type": "remote"')
+})
+
 // Last: it changes the mock's nodes for the rest of the run.
 test('an offline machine stays listed until it is forgotten', async ({ page }) => {
   await signIn(page)

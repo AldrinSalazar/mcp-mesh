@@ -19,6 +19,7 @@ export const router = createRouter({
       component: AppShell,
       children: [
         { path: '', name: 'overview', component: () => import('@/views/OverviewView.vue') },
+        { path: 'connect', name: 'connect', component: () => import('@/views/ConnectView.vue') },
         { path: 'mesh', name: 'mesh', component: () => import('@/views/MeshMapView.vue') },
         { path: 'nodes', name: 'nodes', component: () => import('@/views/NodesView.vue') },
         { path: 'tools', name: 'tools', component: () => import('@/views/ToolsView.vue') },

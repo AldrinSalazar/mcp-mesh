@@ -7,9 +7,9 @@ OAuth.
 
 Create a client key in the dashboard (Keys → Create key → Client key) or
 with the hub's [`key create client <label>`](hub.md#keys-and-admins). The
-dashboard shows a
-ready-to-paste snippet for Claude Code, Claude Desktop, Cursor and a curl
-test.
+dashboard's **Connect** page has ready-to-paste setup for Claude Code,
+Codex, OpenCode, Claude Desktop, Cursor and a curl test, and the new key's
+dialog repeats it with the key filled in.
 
 ## Claude Code
 
@@ -17,6 +17,39 @@ test.
 claude mcp add --transport http mcp-mesh http://<hub>:7002/mcp \
   --header "Authorization: Bearer <client-key>"
 ```
+
+## Codex
+
+In `~/.codex/config.toml` (or `.codex/config.toml` in a trusted project):
+
+```toml
+[mcp_servers.mcp-mesh]
+url = "http://<hub>:7002/mcp"
+http_headers = { "Authorization" = "Bearer <client-key>" }
+```
+
+To keep the key out of the file, use `bearer_token_env_var = "MCPMESH_KEY"`
+instead of `http_headers` and export `MCPMESH_KEY` before starting Codex.
+
+## OpenCode
+
+In `opencode.json` in your project, or `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "mcp-mesh": {
+      "type": "remote",
+      "url": "http://<hub>:7002/mcp",
+      "enabled": true,
+      "headers": { "Authorization": "Bearer <client-key>" }
+    }
+  }
+}
+```
+
+`"Bearer {env:MCPMESH_KEY}"` reads the key from the environment instead.
 
 ## Claude Desktop
 

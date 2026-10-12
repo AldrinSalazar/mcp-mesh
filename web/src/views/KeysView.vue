@@ -120,7 +120,7 @@ const rows = computed(() => {
 
   <section class="panel addr">
     <h2 class="section-title">Connection addresses</h2>
-    <p class="muted sub">Use a key with these addresses to join your mesh.</p>
+    <p class="muted sub">Use a key with these addresses to join your mesh. <RouterLink to="/connect" class="arrow-link">Setup for each client on Connect</RouterLink></p>
     <div class="cols">
       <div>
         <p class="label">Node URL</p>
