@@ -9,11 +9,11 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiField from '@/components/ui/UiField.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiNotice from '@/components/ui/UiNotice.vue'
-import UiSelect from '@/components/ui/UiSelect.vue'
 import CopyField from '@/components/ui/CopyField.vue'
 import { ApiError, api } from '@/lib/api'
 import { live, refresh } from '@/lib/live'
-import { display, pairCommand, snippet, snippetOptions, type SnippetId } from '@/lib/snippets'
+import { pairCommand } from '@/lib/snippets'
+import HarnessSetups from '@/components/connect/HarnessSetups.vue'
 import type { ClientSetup, CreatedKey, KeyKind, NodeSetup, TrustLevel } from '@/lib/types'
 import GroupPicker from '@/components/groups/GroupPicker.vue'
 import { trustLabel, trustLevels } from '@/lib/trust'
@@ -26,7 +26,6 @@ const name = ref('')
 const error = ref('')
 const busy = ref(false)
 const created = ref<CreatedKey | null>(null)
-const which = ref<SnippetId>('claude-code')
 
 const types = [
   { value: 'node' as const, title: 'Node key', text: 'Connect a machine', icon: Monitor },
@@ -91,7 +90,6 @@ const input = computed(() => ({
   secret: created.value?.secret ?? '',
   claudeCode: clientSetup.value?.claude_code ?? '',
 }))
-const snippetTitle = computed(() => snippetOptions.find((o) => o.value === which.value)?.title ?? '')
 </script>
 
 <template>
@@ -217,18 +215,8 @@ const snippetTitle = computed(() => snippetOptions.find((o) => o.value === which
         <CopyField :value="clientSetup.header" label="Copy header" />
       </section>
       <section class="step">
-        <div class="snip-head">
-          <p class="label">{{ snippetTitle }}</p>
-          <div class="other">
-            <UiSelect v-model="which" label="Client" :options="snippetOptions.map((o) => ({ value: o.value, label: o.label }))" />
-          </div>
-        </div>
-        <CopyField
-          :value="snippet(which, input)"
-          :display="display(which, input)"
-          multiline
-          label="Copy snippet"
-        />
+        <p class="label">Add it to your client</p>
+        <HarnessSetups :input="input" />
       </section>
       <p v-if="live.info?.oauth" class="note muted">Apps that support OAuth can add the MCP URL instead of a key.</p>
     </template>
@@ -283,10 +271,6 @@ const snippetTitle = computed(() => snippetOptions.find((o) => o.value === which
 .step { margin-top: 26px; }
 .step .label { margin-bottom: 10px; }
 .note { margin-top: 18px; font-size: 12px; }
-.snip-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.snip-head .label { margin: 0; }
-.other { width: 170px; }
-.other :deep(select) { height: 32px; font-size: 12px; border-color: transparent; background: transparent; text-align: right; }
 @media (max-width: 600px) {
   .types { grid-template-columns: 1fr; }
 }

@@ -2,6 +2,7 @@
 // Overview: the hub at a glance. Metrics, what needs attention, recent calls;
 // a fresh hub with no nodes gets the connect guide instead.
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Activity, CircleDot, Code, Plus } from 'lucide-vue-next'
 import { live, useNow } from '@/lib/live'
 import { openCreateKey } from '@/lib/dialogs'
@@ -16,6 +17,7 @@ import ConnectGuide from '@/components/overview/ConnectGuide.vue'
 import { approvalItems, callsLine, groupsLine, metrics, nodesLine } from '@/components/overview/summary'
 
 const now = useNow()
+const router = useRouter()
 
 const loaded = computed(() => live.loaded.nodes)
 const fresh = computed(() => loaded.value && live.nodes.length === 0)
@@ -32,7 +34,7 @@ const mcpShort = computed(() => (m.value.groups.waiting ? `${m.value.groups.wait
 
 <template>
   <PageHeader title="Overview">
-    <UiButton v-if="!live.authOff && !fresh" class="desktop-btn" variant="primary" :icon="Plus" @click="openCreateKey('node')">Connect something</UiButton>
+    <UiButton v-if="!fresh" class="desktop-btn" variant="primary" :icon="Plus" @click="router.push({ name: 'connect' })">Connect something</UiButton>
   </PageHeader>
 
   <ConnectGuide v-if="fresh" :info="live.info" :auth-off="live.authOff" :pairing="live.settings?.pairing" :requests="live.pairings" @key="openCreateKey" />
@@ -57,7 +59,7 @@ const mcpShort = computed(() => (m.value.groups.waiting ? `${m.value.groups.wait
 
     <RecentCalls class="gap" :calls="recent" :loaded="live.loaded.calls" @connect-client="openCreateKey('client')" />
 
-    <UiButton v-if="!live.authOff" class="mobile-btn" variant="primary" block :icon="Plus" @click="openCreateKey('node')">Connect something</UiButton>
+    <UiButton class="mobile-btn" variant="primary" block :icon="Plus" @click="router.push({ name: 'connect' })">Connect something</UiButton>
   </template>
 </template>
 
