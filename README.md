@@ -139,11 +139,19 @@ Open the dashboard at `http://localhost:7000` and sign in as `admin`.
 
 ### 2. Connect a machine
 
-Download `mcp-mesh-node` for that machine from the
+Install `mcp-mesh-node` on that machine. On macOS or Linux, with
+[Homebrew](https://brew.sh):
+
+```sh
+brew install aldrinsalazar/tap/mcp-mesh-node
+```
+
+Or download it from the
 [latest release](https://github.com/AldrinSalazar/mcp-mesh/releases/latest)
-(Linux and macOS; Windows is a preview). In the dashboard's Keys, create a
-node key named after the machine. The dashboard shows a one-line setup
-command; run it on that machine:
+(Linux and macOS; Windows is a preview).
+
+In the dashboard's Keys, create a node key named after the machine. The
+dashboard shows a one-line setup command; run it on that machine:
 
 ```sh
 mcp-mesh-node init --hub ws://<hub>:7001/node --name <machine> --key <node-key>

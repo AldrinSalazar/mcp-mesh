@@ -1,8 +1,9 @@
 # mcp-mesh-node for every platform. Every push builds them as workflow
 # artifacts; a v* tag also publishes them, with checksums and the changes
 # since the last release, as a GitHub release (a pre-release for tags such
-# as v1.2.0-rc.1). Asset names carry no version, so
-# releases/latest/download/<asset> always points at the newest one.
+# as v1.2.0-rc.1), and a stable tag updates the Homebrew formula. Asset
+# names carry no version, so releases/latest/download/<asset> always points
+# at the newest one.
 name: Node binaries
 
 on:
@@ -71,6 +72,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -96,7 +101,7 @@ jobs:
 
           ## Node
 
-          Download the archive for your machine below; \`SHA256SUMS\` has their checksums. See [Node configuration](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/node.md#install).
+          On macOS or Linux, install or upgrade with Homebrew: \`brew install $owner/tap/mcp-mesh-node\` or \`brew upgrade mcp-mesh-node\`. Or download the archive for your machine below; \`SHA256SUMS\` has their checksums. See [Node configuration](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/node.md#install).
 
           | | x86-64 | x86 (32-bit) | ARM 64-bit | ARM 32-bit |
           | --- | --- | --- | --- | --- |
@@ -119,3 +124,33 @@ jobs:
             gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
               --title "mcp-mesh ${TAG#v}" --notes "$(cat notes.md)" --generate-notes "${flags[@]}"
           fi
+      # A stable release updates the Homebrew formula in <owner>/homebrew-tap.
+      # HOMEBREW_TAP_DEPLOY_KEY is the private half of a deploy key with write
+      # access to that repository only.
+      - name: Homebrew formula
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          TAG: ${{ github.ref_name }}
+          TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          if [ -z "$TAP_DEPLOY_KEY" ]; then
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY is not set; the Homebrew formula was not updated"
+            exit 0
+          fi
+          umask 077
+          printf '%s\n' "$TAP_DEPLOY_KEY" > "$RUNNER_TEMP/tap_key"
+          # GitHub's published host key (api.github.com/meta).
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$RUNNER_TEMP/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/tap_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts -o StrictHostKeyChecking=yes"
+          go run ./tools/brewformula -tag "$TAG" -repo "$GITHUB_REPOSITORY" dist/SHA256SUMS > mcp-mesh-node.rb
+          git clone -q "git@github.com:$GITHUB_REPOSITORY_OWNER/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cp mcp-mesh-node.rb tap/Formula/
+          cd tap
+          git add Formula/mcp-mesh-node.rb
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "mcp-mesh-node ${TAG#v}"
+          git push -q

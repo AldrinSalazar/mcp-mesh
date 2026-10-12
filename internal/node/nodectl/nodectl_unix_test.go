@@ -699,3 +699,49 @@ func TestForwardingWhenStopped(t *testing.T) {
 		}
 	}
 }
+
+// A node installed with Homebrew must give the service a path that survives
+// brew upgrade, which deletes the old version's keg.
+func TestHomebrewOpt(t *testing.T) {
+	prefix, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	keg := filepath.Join(prefix, "Cellar", "mcp-mesh-node", "1.0.0")
+	if err := os.MkdirAll(filepath.Join(keg, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(keg, "bin", "mcp-mesh-node")
+	if err := os.WriteFile(exe, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Before brew links the keg there is no opt link to use.
+	if got := homebrewOpt(exe); got != exe {
+		t.Fatalf("without opt link: %s", got)
+	}
+	if err := os.MkdirAll(filepath.Join(prefix, "opt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../Cellar/mcp-mesh-node/1.0.0", filepath.Join(prefix, "opt", "mcp-mesh-node")); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := homebrewOpt(exe), filepath.Join(prefix, "opt", "mcp-mesh-node", "bin", "mcp-mesh-node"); got != want {
+		t.Fatalf("homebrewOpt = %s, want %s", got, want)
+	}
+	// An opt link to another version doesn't stand for this binary.
+	other := filepath.Join(prefix, "Cellar", "mcp-mesh-node", "0.9.0", "bin", "mcp-mesh-node")
+	if err := os.MkdirAll(filepath.Dir(other), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := homebrewOpt(other); got != other {
+		t.Fatalf("other version: %s", got)
+	}
+	for _, path := range []string{"/usr/local/bin/mcp-mesh-node", filepath.Join(prefix, "Cellar", "mcp-mesh-node")} {
+		if got := homebrewOpt(path); got != path {
+			t.Fatalf("homebrewOpt(%s) = %s", path, got)
+		}
+	}
+}
