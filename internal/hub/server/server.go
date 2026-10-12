@@ -362,7 +362,7 @@ func Run(ctx context.Context, cfg Config) error {
 	registry := nodes.NewRegistry(registryOpts)
 	gw = gateway.New(gatewayOpts)
 	apiOpts.Nodes = registry
-	knownNodes, err := known.Open(ctx, db.DB, log.With("component", "known"))
+	knownNodes, err := known.Open(context.WithoutCancel(ctx), db.DB, log.With("component", "known"))
 	if err != nil {
 		return err
 	}
