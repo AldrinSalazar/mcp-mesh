@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -477,5 +478,44 @@ func TestSendRespectsPeerLimit(t *testing.T) {
 	}
 	if e, err := b.Recv(ctx); err != nil || e.Ch != "ok" {
 		t.Fatalf("Recv = %+v, %v", e, err)
+	}
+}
+
+// A sender whose context ends while its frame is going out must not cut
+// the connection: it carries every channel of a node, and one call or
+// channel ending (the usual reason a context ends) would take the others
+// down with it. Cancelling only gives up waiting for a turn.
+func TestCancelDuringWriteKeepsConnection(t *testing.T) {
+	for _, size := range []int{100, 3*ChunkSize + 7} {
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			client, server := pair(t, 1<<20)
+			ctx, cancel := context.WithCancel(testCtx(t))
+			client.beforeWrite = func() {
+				cancel()
+				client.beforeWrite = nil
+			}
+			msg := json.RawMessage(`"` + strings.Repeat("x", size) + `"`)
+			sendErr := client.Send(ctx, &proto.Envelope{T: proto.TMCP, Ch: "a", Msg: msg})
+
+			// The connection still works both ways.
+			if err := client.Send(testCtx(t), &proto.Envelope{T: proto.TMCP, Ch: "b", Msg: json.RawMessage(`{"ok":1}`)}); err != nil {
+				t.Fatalf("send after a cancelled send: %v (the cancelled one: %v)", err, sendErr)
+			}
+			for {
+				e, err := server.Recv(testCtx(t))
+				if err != nil {
+					t.Fatalf("recv: %v", err)
+				}
+				if e.Ch == "b" {
+					break
+				}
+			}
+			if err := server.Send(testCtx(t), &proto.Envelope{T: proto.TMCP, Ch: "c", Msg: json.RawMessage(`{}`)}); err != nil {
+				t.Fatalf("send back: %v", err)
+			}
+			if _, err := client.Recv(testCtx(t)); err != nil {
+				t.Fatalf("recv back: %v", err)
+			}
+		})
 	}
 }
