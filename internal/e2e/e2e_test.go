@@ -459,3 +459,40 @@ func testCancelStatelessHTTP(t *testing.T, clientVersion string) {
 		t.Fatalf("a call after the cancellation: %+v, %v", res, err)
 	}
 }
+
+// Text an MCP sends reaches clients byte for byte: a description with
+// non-ASCII characters (Fusion's use "→") through an HTTP MCP, the node,
+// the hub and the gateway.
+func TestEndToEndKeepsUTF8(t *testing.T) {
+	const desc = "fusion_subscription → Opens Plans and pricing · café 日本 ✓"
+	s := mcp.NewServer(&mcp.Implementation{Name: "utf8", Version: "1"}, nil)
+	mcp.AddTool(s, &mcp.Tool{Name: "execute", Description: desc},
+		func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: desc}}}, nil, nil
+		})
+	upstreamSrv := httptest.NewServer(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil))
+	t.Cleanup(upstreamSrv.Close)
+
+	h := startHub(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- agent.Run(ctx, agent.Config{HubURL: h.nodeURL, Node: "alpha", MCPs: []agent.MCP{
+			{Name: "fusion", Upstream: upstream.NewHTTP(upstream.HTTPConfig{URL: upstreamSrv.URL}), Sharing: proto.SharingShared},
+		}})
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+	cs, _ := connectClient(t, h)
+	tools := waitTools(t, cs, "the UTF-8 tool", func(m map[string]*mcp.Tool) bool { return m["alpha__fusion__execute"] != nil })
+	// The gateway names the source in front; the MCP's text follows unchanged.
+	if got := tools["alpha__fusion__execute"].Description; got != "[alpha/fusion] "+desc {
+		t.Fatalf("description = %q (% x), want %q", got, got, desc)
+	}
+	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{Name: "alpha__fusion__execute", Arguments: map[string]any{}})
+	if err != nil || text(t, res) != desc {
+		t.Fatalf("result = %+v, %v", res, err)
+	}
+}

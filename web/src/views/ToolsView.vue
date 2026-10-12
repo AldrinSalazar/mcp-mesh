@@ -202,7 +202,8 @@ function clear() {
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .count { font-size: 12px; padding: 0 12px 0 16px; white-space: nowrap; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
-.layout.split { grid-template-columns: minmax(0, 1fr) 370px; }
+/* The detail grows with the screen: long descriptions need the room. */
+.layout.split { grid-template-columns: minmax(0, 1fr) clamp(370px, 36%, 720px); }
 .head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 190px) 44px; gap: 16px; align-items: center; height: 40px; padding-left: 24px; background: var(--paper); }
 .head .h2 { grid-column: 2; }
 .head span { white-space: nowrap; }

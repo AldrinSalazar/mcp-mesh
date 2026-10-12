@@ -22,7 +22,8 @@ onMounted(start)
     <div v-if="drawer" class="drawer-scrim" @click="drawer = false" />
     <div class="main">
       <TopBar @menu="drawer = true" />
-      <main class="content">
+      <!-- Tables with a detail panel (Tools, Activity, Approvals) use the whole width. -->
+      <main class="content" :class="{ wide: route.meta.wide }">
         <UiNotice v-if="live.authOff" tone="warn" class="auth-off">
           <strong>Authentication is off: anyone who can reach this hub can use every tool.</strong>
         </UiNotice>
@@ -46,6 +47,7 @@ onMounted(start)
 }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .content { flex: 1; padding: 40px var(--inset) 48px; width: 100%; max-width: 1440px; }
+.content.wide { max-width: 2400px; }
 .auth-off { margin-bottom: 28px; padding: 24px 20px; font-size: 14px; }
 .drawer-scrim { display: none; }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RichText from '@/components/ui/RichText.vue'
 import type { Prompt } from '@/lib/types'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import ItemDetail from './ItemDetail.vue'
@@ -10,7 +11,8 @@ defineEmits<{ close: [] }>()
 <template>
   <ItemDetail kind="Prompt" :title="prompt.original_name" :copy-value="prompt.name" copy-label="Copy exposed name" @close="$emit('close')">
     <p class="mono gen muted" :title="prompt.name">{{ prompt.name }}</p>
-    <p class="text">{{ prompt.description || 'No description.' }}</p>
+    <RichText v-if="prompt.description" class="text" :text="prompt.description" />
+    <p v-else class="text muted">No description.</p>
     <section class="sec">
       <span class="label">Source</span>
       <p class="mono src" :title="`${prompt.node} / ${prompt.mcp}`">{{ prompt.node }} / {{ prompt.mcp }}</p>
