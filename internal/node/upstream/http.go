@@ -318,7 +318,7 @@ func (c *httpConn) post(ctx context.Context, raw []byte, version string, req, ca
 		defer resp.Body.Close()
 		var err error
 		if typ == "application/json" {
-			err = c.readJSON(resp.Body)
+			err = c.readJSON(resp, call)
 		} else {
 			err = c.readSSE(resp.Body, call)
 		}
@@ -363,16 +363,38 @@ func (c *httpConn) deliver(raw []byte) (jsonrpc.Message, error) {
 		return nil, c.ctx.Err()
 	}
 }
-func (c *httpConn) readJSON(r io.Reader) error {
-	raw, err := io.ReadAll(io.LimitReader(r, proto.DefaultMaxMessageSize+1))
+func (c *httpConn) readJSON(resp *http.Response, call *jsonrpc.Request) error {
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, proto.DefaultMaxMessageSize+1))
 	if err != nil {
 		return err
 	}
 	if len(raw) > proto.DefaultMaxMessageSize {
 		return errors.New("HTTP message exceeds size limit")
 	}
+	if resp.StatusCode != http.StatusOK && call != nil {
+		if _, err := jsonrpc.DecodeMessage(raw); err != nil {
+			// Some servers reject a call with a plain JSON body, not JSON-RPC
+			// (Fusion answers server/discover with {"error":"Missing
+			// MCP-Session-Id header"}). Answer the call with it so the hub can
+			// fall back to initialize, as it does for a JSON-RPC error.
+			if raw, err = jsonrpc.EncodeMessage(&jsonrpc.Response{ID: call.ID, Error: rejectedCall(resp.Status, raw)}); err != nil {
+				return err
+			}
+		}
+	}
 	_, err = c.deliver(raw)
 	return err
+}
+
+// rejectedCall is the JSON-RPC error for a call the server refused with a
+// body that isn't JSON-RPC.
+func rejectedCall(status string, body []byte) *jsonrpc.Error {
+	const limit = 512
+	text := strings.ToValidUTF8(strings.TrimSpace(string(body)), "�")
+	if len(text) > limit {
+		text = strings.ToValidUTF8(text[:limit], "") + "…"
+	}
+	return &jsonrpc.Error{Code: jsonrpc.CodeInvalidRequest, Message: fmt.Sprintf("HTTP POST: %s: %s", status, text)}
 }
 func (c *httpConn) readSSE(r io.Reader, call *jsonrpc.Request) error {
 	scanner := bufio.NewScanner(r)

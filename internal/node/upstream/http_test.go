@@ -1,10 +1,14 @@
 package upstream
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"testing"
 
@@ -183,6 +187,66 @@ func TestHTTPRawRelay(t *testing.T) {
 	raw, _ := jsonrpc.EncodeMessage(got)
 	if string(raw) != incoming {
 		t.Fatalf("response changed: %s", raw)
+	}
+}
+
+// A session-based server that rejects calls without a session with a plain
+// JSON body (as Fusion does) must not end the connection: the call gets a
+// JSON-RPC error, and the client falls back from server/discover to initialize.
+func TestHTTPPlainErrorBody(t *testing.T) {
+	ctx := testContext(t)
+	server := testServer(nil)
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	var mu sync.Mutex
+	var rejected []string
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.Header.Get("Mcp-Session-Id") == "" {
+			body, _ := io.ReadAll(r.Body)
+			var msg struct {
+				Method string `json:"method"`
+			}
+			_ = json.Unmarshal(body, &msg)
+			if msg.Method != "initialize" {
+				mu.Lock()
+				rejected = append(rejected, msg.Method)
+				mu.Unlock()
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = io.WriteString(w, `{"error": "Missing MCP-Session-Id header"}`)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	conn, err := NewHTTP(HTTPConfig{URL: httpServer.URL}).Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	msg, _ := jsonrpc.DecodeMessage([]byte(`{"jsonrpc":"2.0","id":7,"method":"tools/list"}`))
+	if err := conn.Write(ctx, msg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, ok := got.(*jsonrpc.Response)
+	var rpcErr *jsonrpc.Error
+	if !ok || resp.ID != msg.(*jsonrpc.Request).ID || !errors.As(resp.Error, &rpcErr) ||
+		rpcErr.Message != `HTTP POST: 400 Bad Request: {"error": "Missing MCP-Session-Id header"}` {
+		t.Fatalf("response = %#v", got)
+	}
+
+	session := connectClient(t, ctx, conn, nil)
+	checkTools(t, ctx, session, false)
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(rejected, []string{"tools/list", "server/discover"}) {
+		t.Fatalf("rejected = %v", rejected)
 	}
 }
 
