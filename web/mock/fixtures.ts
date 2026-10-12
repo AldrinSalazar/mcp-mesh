@@ -1,7 +1,7 @@
 // Fixture hub state for `npm run dev:mock`, modelled on the Penpot mockups
 // (home-lab with workstation, mac-mini, laptop and studio-pc). Times are
 // relative to when the dev server starts.
-import type { Prompt, ResourceItem, Admin, AdminLogEntry, AuditEntry, Call, Group, Info, Key, Node, NodeTrust, PairingRequest, PendingTool, Settings, Tool, ToolOverride } from '../src/lib/types.ts'
+import type { Prompt, ResourceItem, Admin, AdminLogEntry, AuditEntry, Call, Group, Info, Key, Node, NodeTrust, PairingRequest, PendingTool, Settings, Tool, ToolOverride, UpdateInfo } from '../src/lib/types.ts'
 
 const t0 = Date.now()
 const ago = (ms: number) => new Date(t0 - ms).toISOString()
@@ -18,13 +18,23 @@ export const info: Info = {
   oauth: true,
 }
 
+// A newer release is out; laptop still runs the previous one.
+export const update: UpdateInfo = {
+  enabled: true,
+  version: '1.0.0',
+  latest: '1.1.0',
+  update_available: true,
+  release_url: 'https://github.com/AldrinSalazar/mcp-mesh/releases/tag/v1.1.0',
+  checked_at: ago(2 * hour),
+}
+
 const trusted: NodeTrust = { level: 'trust', explicit: false, approved: true }
 
 const unreachable = 'nothing is listening (is the app serving this MCP running?)'
 
 export const nodes: Node[] = [
   {
-    name: 'workstation', node_version: '0.2.0', os: 'windows', remote_addr: '192.168.1.20:51234', key_id: 'k_n8d2a1b3',
+    name: 'workstation', node_version: '1.1.0', os: 'windows', remote_addr: '192.168.1.20:51234', key_id: 'k_n8d2a1b3',
     connected_at: ago(3 * hour + 24 * min), online: true, trust: trusted, pending_tools: 0,
     mcps: [
       { name: 'filesystem', transport: 'stdio', sharing: 'shared', start: 'eager', state: 'ready', error: '', tools: 6, in_flight: 1, queued: 0, server: 'filesystem 1.4.0', prompts: 0, resources: 0, call_timeout_ms: 0, clients: 0, problems: [] },
@@ -33,7 +43,7 @@ export const nodes: Node[] = [
     ],
   },
   {
-    name: 'mac-mini', node_version: '0.2.0', os: 'darwin', remote_addr: '192.168.1.21:60111', key_id: 'k_n4b6c7d8',
+    name: 'mac-mini', node_version: '1.1.0', os: 'darwin', remote_addr: '192.168.1.21:60111', key_id: 'k_n4b6c7d8',
     connected_at: ago(5 * hour + 12 * min), online: true,
     trust: { level: 'review', explicit: true, approved: true }, pending_tools: 1,
     mcps: [
@@ -44,7 +54,7 @@ export const nodes: Node[] = [
     ],
   },
   {
-    name: 'laptop', node_version: '0.2.0', os: 'linux', remote_addr: '192.168.1.34:40022', key_id: 'k_n1e2f3a4',
+    name: 'laptop', node_version: '1.0.0', outdated: true, os: 'linux', remote_addr: '192.168.1.34:40022', key_id: 'k_n1e2f3a4',
     connected_at: ago(42 * min), online: true, trust: trusted, pending_tools: 0,
     mcps: [
       { name: 'browser', transport: 'stdio', sharing: 'per-client', start: 'eager', state: 'ready', error: '', tools: 6, in_flight: 0, queued: 0, server: 'playwright-mcp 0.0.40', prompts: 0, resources: 0, call_timeout_ms: 0, clients: 2, problems: [] },
@@ -52,7 +62,7 @@ export const nodes: Node[] = [
     ],
   },
   {
-    name: 'nas', node_version: '0.2.0', os: 'linux', remote_addr: '192.168.1.40:41000', key_id: 'k_n5d4e3f2',
+    name: 'nas', node_version: '1.1.0', os: 'linux', remote_addr: '192.168.1.40:41000', key_id: 'k_n5d4e3f2',
     connected_at: ago(6 * min), online: true,
     trust: { level: 'approve', explicit: true, approved: false }, pending_tools: 3,
     mcps: [
@@ -60,7 +70,7 @@ export const nodes: Node[] = [
     ],
   },
   {
-    name: 'studio-pc', node_version: '0.2.0', os: 'windows', remote_addr: '', key_id: 'k_n9a8b7c6',
+    name: 'studio-pc', node_version: '1.1.0', os: 'windows', remote_addr: '', key_id: 'k_n9a8b7c6',
     connected_at: ago(2 * day), online: false, disconnected_at: ago(18_000), mcps: [],
     trust: trusted, pending_tools: 0,
   },

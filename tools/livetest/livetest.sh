@@ -15,6 +15,8 @@ export PATH=$HOME/.local/go/bin:$PATH GOCACHE=${GOCACHE:-$PWD/.cache/go-build}
 sbx=$(mktemp -d /tmp/mm-livetest.XXXXXX)
 mkdir -p "$sbx"/{bin,cfg,state,run}
 export XDG_CONFIG_HOME=$sbx/cfg XDG_STATE_HOME=$sbx/state XDG_RUNTIME_DIR=$sbx/run MCPMESH_NO_INPUT=1
+# The binaries are tagged builds; keep them off GitHub's releases API.
+export MCPMESH_NO_UPDATE_CHECK=1
 hub=http://127.0.0.1:7102/mcp
 pids=()
 failures=0
@@ -241,6 +243,8 @@ if api_login; then pass "API sign-in returns a CSRF token"; else fail "API sign-
 expect_ok "API lists the node's MCPs" "^200[^$]*" api GET /nodes
 expect_ok "API node list names the node and its key" '"name":"livetest".*"key_id":"k_' api GET /nodes
 expect_ok "API tools list has the launch MCP" "livetest__cli__render" api GET /tools
+expect_ok "the update check is off, as asked" '"enabled":false' api GET /update
+expect_ok "the node isn't flagged as outdated" '"name":"livetest".*"outdated":false' api GET /nodes
 expect_ok "API says which definitions were dropped and why" '"name":"bad"[^}]*"problems":\["tool \\"no_schema\\" dropped: [^]]*missing input schema' api GET /nodes
 expect_ok "audit log has the earlier calls" '"tool":"livetest__cli__render".*"outcome":"ok"' api GET '/audit?tool=livetest__cli__render'
 expect_ok "stats count the last hour's calls" '"calls_last_hour":[1-9][0-9]*,' api GET /stats

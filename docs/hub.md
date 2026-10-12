@@ -163,7 +163,32 @@ Every flag also reads an environment variable.
 | `--admin-user`, `--admin-password` | `MCPMESH_ADMIN_USER`, `MCPMESH_ADMIN_PASSWORD` (`_FILE`) | `admin`, generated | the first admin, first start only |
 | `--call-timeout` | `MCPMESH_CALL_TIMEOUT` | `2m` | longest tool call (MCPs can set their own) |
 | `--mdns`, `--name` | `MCPMESH_MDNS`, `MCPMESH_NAME` | `true`, hostname | LAN announcement |
+| `--no-update-check` | `MCPMESH_NO_UPDATE_CHECK` | `false` | don't ask GitHub for newer releases ([Updates](#updates)) |
 | `--log-level`, `--log-format` | `MCPMESH_LOG_LEVEL`, `MCPMESH_LOG_FORMAT` | `info`, `text` | logging |
+
+## Updates
+
+Once a day the hub asks GitHub's releases API whether a newer mcp-mesh
+release is out: one plain GET to `api.github.com`, which sends nothing
+about the hub. The answer is kept in the database, so a restart doesn't
+ask again; offline or rate limited, the hub keeps the last answer and
+says nothing. Builds without a release version (`dev`) never ask.
+
+When a newer release is out, the dashboard shows a banner with the release
+notes and the upgrade command, until an admin dismisses it for that
+release. To upgrade a hub run with Compose:
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+The Nodes page marks nodes that run an older version than the latest
+release (or than the hub itself, before the hub knows the latest), and
+Overview counts them under Needs attention. Nothing is upgraded on its own.
+
+For air-gapped hubs, or to keep the hub from contacting GitHub, use
+`--no-update-check` (`MCPMESH_NO_UPDATE_CHECK=true`). Nodes are then
+compared with the hub's own version.
 
 ## Backup
 

@@ -2,7 +2,7 @@
 // token to state-changing requests and turns error bodies into ApiError.
 import type {
   Admin, AdminLogEntry, ApprovalRef, AuditPage, AuditQuery, Call, CreatedKey, Grant, Group, Info, Key, KeyKind, Node,
-  PairingRequest, PendingTool, Prompt, ResourceItem, Session, Settings, Stats, Tool, ToolOverride, TrustLevel,
+  PairingRequest, PendingTool, Prompt, ResourceItem, Session, Settings, Stats, Tool, ToolOverride, TrustLevel, UpdateInfo,
 } from './types'
 
 const base = '/api/v1'
@@ -82,6 +82,7 @@ function query(q: object): string {
 
 export const api = {
   info: () => request<Info>('GET', '/info'),
+  update: () => request<UpdateInfo>('GET', '/update'),
 
   // session returns null when not signed in, {auth:false} when auth is off.
   session: async (): Promise<Session | { auth: false } | null> => {

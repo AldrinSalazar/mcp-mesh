@@ -44,6 +44,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/store"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/trust"
 	"github.com/AldrinSalazar/mcp-mesh/internal/proto"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 	"github.com/AldrinSalazar/mcp-mesh/web"
 )
 
@@ -81,6 +82,9 @@ type Config struct {
 	// AdminPassword makes the hub generate one and log it once.
 	AdminUser     string
 	AdminPassword string
+
+	// NoUpdateCheck stops the hub from asking GitHub for newer releases.
+	NoUpdateCheck bool
 
 	Version string
 	Logger  *slog.Logger // nil means slog.Default()
@@ -304,6 +308,10 @@ func Run(ctx context.Context, cfg Config) error {
 			return tr.NodeVisible(node) && (groups == nil || groups.Allows(c.ID, node, mcp, "*"))
 		},
 	}
+	updates := update.New(update.Options{
+		Current: cfg.Version, Disabled: cfg.NoUpdateCheck,
+		Cache: settingsCache{db}, Logger: log.With("component", "update"),
+	})
 	apiOpts := api.Options{
 		Catalog:       cat,
 		Recent:        calls,
@@ -315,6 +323,7 @@ func Run(ctx context.Context, cfg Config) error {
 		Logger:        log.With("component", "api"),
 		Trust:         tr,
 		Overrides:     toolOverrides,
+		Updates:       updates,
 	}
 	if cfg.Auth {
 		registryOpts.Authorize = auth.AuthorizeNode
@@ -429,6 +438,7 @@ func Run(ctx context.Context, cfg Config) error {
 	g.Go(func() error { audit.Run(auditCtx); return nil })
 	g.Go(func() error { apiServer.Run(ctx); return nil })
 	g.Go(func() error { tr.Run(ctx); return nil })
+	g.Go(func() error { updates.Run(ctx); return nil })
 	g.Go(func() error { knownNodes.Run(ctx, registry.Nodes, 2*time.Second); return nil })
 	g.Go(func() error { toolOverrides.Watch(ctx, time.Second); return nil })
 	if groups != nil {
@@ -515,6 +525,30 @@ func Run(ctx context.Context, cfg Config) error {
 	})
 	log.Info("mcp-mesh-hub started", "version", cfg.Version, "node_url", cfg.NodeURL, "client_url", cfg.ClientURL, "auth", cfg.Auth)
 	return g.Wait()
+}
+
+// settingsCache keeps the update check's answer in the settings table, so
+// a restarted hub doesn't ask again.
+type settingsCache struct{ db *store.DB }
+
+func (c settingsCache) Load(ctx context.Context) (update.State, error) {
+	var s update.State
+	v, ok, err := c.db.Setting(ctx, store.SettingUpdate)
+	if err != nil || !ok {
+		return s, err
+	}
+	if err := json.Unmarshal([]byte(v), &s); err != nil {
+		return update.State{}, fmt.Errorf("decode %s: %w", store.SettingUpdate, err)
+	}
+	return s, nil
+}
+
+func (c settingsCache) Save(ctx context.Context, s update.State) error {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	return c.db.SetSettings(ctx, map[string]string{store.SettingUpdate: string(b)})
 }
 
 // auditLossWindow is how recently the audit log may have lost calls before

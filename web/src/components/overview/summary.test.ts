@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { approvalItems, callsLine, groupMcps, groupsLine, metrics, nodesLine } from './summary'
+import { approvalItems, callsLine, groupMcps, groupsLine, metrics, nodesLine, outdatedItems } from './summary'
 import type { MCP, Node, PairingRequest, PendingTool, Tool } from '@/lib/types'
 
 const mcp = (over: Partial<MCP>): MCP => ({
@@ -61,5 +61,17 @@ describe('approvalItems', () => {
     const items = approvalItems(nodes, [pend('mac')], [p])
     expect(items.map((i) => i.title)).toEqual(['render-box asks to join', '1 tool waiting for approval'])
     expect(items[0]).toMatchObject({ key: 'pairing/p_1', detail: 'Code K7Q-4MX · 10.0.0.9', to: { path: '/approvals' } })
+  })
+})
+
+describe('outdatedItems', () => {
+  it('is empty when every node is current', () => {
+    expect(outdatedItems([node('a', true, [])])).toEqual([])
+  })
+  it('names the nodes behind and opens the one when alone', () => {
+    const one = outdatedItems([node('a', true, []), { ...node('b', true, []), outdated: true }])
+    expect(one).toEqual([{ key: 'outdated', title: '1 node runs an older version', detail: 'b', to: { path: '/nodes', query: { node: 'b' } } }])
+    const two = outdatedItems([{ ...node('a', true, []), outdated: true }, { ...node('b', false, []), outdated: true }])
+    expect(two[0]).toMatchObject({ title: '2 nodes run an older version', detail: 'a, b', to: { path: '/nodes' } })
   })
 })

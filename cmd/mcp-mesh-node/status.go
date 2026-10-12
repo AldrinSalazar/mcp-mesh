@@ -59,6 +59,22 @@ func hubKeyState(s nodectl.Snapshot) hubKeyJSON {
 	return hubKeyJSON{}
 }
 
+// updateLines say what to do about versions: a newer release, a node that
+// runs an older binary than the installed one, or one older than its hub.
+func updateLines(u nodectl.UpdateState) []string {
+	var lines []string
+	switch {
+	case u.Latest != "":
+		lines = append(lines, fmt.Sprintf("Update available: %s (%s); upgrade: %s, then restart the node (mcp-mesh-node stop && mcp-mesh-node start)", u.Latest, u.URL, u.Upgrade))
+	case u.Hub != "":
+		lines = append(lines, fmt.Sprintf("The hub runs %s, newer than this node; upgrade: %s, then restart the node", u.Hub, u.Upgrade))
+	}
+	if u.Running != "" {
+		lines = append(lines, fmt.Sprintf("The running node is %s, older than this mcp-mesh-node; restart it to use the new one: mcp-mesh-node stop && mcp-mesh-node start", u.Running))
+	}
+	return lines
+}
+
 // pairingHint tells the user what to do with a pairing code.
 func pairingHint(code string) string {
 	return fmt.Sprintf("approve this machine in the hub's dashboard (Approvals); check it shows code %s", code)
@@ -140,6 +156,9 @@ func printStatus(cmd *cobra.Command, s nodectl.Snapshot, asJSON bool) error {
 	fmt.Fprintf(out, "Config: %s (%s)\n", s.ConfigPath, validity)
 	if s.Daemon.Running && s.Daemon.Status.ConfigChanged {
 		fmt.Fprintln(out, "Config changes not applied yet: run mcp-mesh-node reload (restarts the node's MCPs)")
+	}
+	for _, line := range updateLines(s.Update) {
+		fmt.Fprintln(out, line)
 	}
 	if len(s.Config.Entries) == 0 && len(s.Daemon.Status.MCPs) == 0 {
 		fmt.Fprintln(out, "MCPs: none yet (add one with mcp-mesh-node add)")

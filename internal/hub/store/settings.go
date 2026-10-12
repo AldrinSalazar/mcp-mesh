@@ -15,6 +15,10 @@ const (
 	SettingClientURL = "hub.client_url"
 )
 
+// SettingUpdate holds the last answer of the check for newer releases
+// (update.State as JSON).
+const SettingUpdate = "hub.update_check"
+
 // Setting returns a value from the settings table; ok is false when the
 // key has none.
 func (db *DB) Setting(ctx context.Context, key string) (value string, ok bool, err error) {

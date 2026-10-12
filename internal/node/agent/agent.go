@@ -20,6 +20,7 @@ import (
 
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/upstream"
 	"github.com/AldrinSalazar/mcp-mesh/internal/proto"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 	"github.com/AldrinSalazar/mcp-mesh/internal/wire"
 )
 
@@ -65,6 +66,9 @@ type Config struct {
 	// node and with false (and the reason) when that connection ends or a
 	// connection attempt fails.
 	OnConnState func(connected bool, err error)
+	// OnWelcome, if set, is called with the hub's welcome on each
+	// connection, before OnConnState.
+	OnWelcome func(proto.Welcome)
 	// Pairing, if set, lets a node the hub turns away for having no key ask
 	// for one. Once paired the node connects with the new key and name.
 	Pairing *Pairing
@@ -166,7 +170,7 @@ func run(ctx context.Context, cfg Config, opts options) error {
 		conn, err := wire.Dial(ctx, cfg.HubURL, header, cfg.MaxMessageSize)
 		if err == nil {
 			started := time.Now()
-			err = serve(ctx, conn, newHello(), mcps, cfg.Logger, cfg.OnConnState, opts.queueLimit, cfg.InFlight)
+			err = serve(ctx, conn, newHello(), mcps, cfg.Logger, cfg.OnWelcome, cfg.OnConnState, opts.queueLimit, cfg.InFlight)
 			if time.Since(started) >= opts.resetAfter {
 				backoff = opts.minBackoff
 			}
@@ -203,7 +207,10 @@ func run(ctx context.Context, cfg Config, opts options) error {
 			cfg.OnConnState(false, err)
 		}
 		code := wire.CloseStatus(err)
-		if code == proto.CloseUnsupportedVersion || code == proto.CloseNodeNameTaken {
+		if code == proto.CloseUnsupportedVersion {
+			return fmt.Errorf("hub rejected node: %w; this node is too old for the hub: upgrade mcp-mesh-node (%s), then restart it", err, update.NodeUpgrade(update.Executable()))
+		}
+		if code == proto.CloseNodeNameTaken {
 			return fmt.Errorf("hub rejected node: %w", err)
 		}
 		if errors.As(err, new(errUnsupportedVersion)) {
@@ -345,7 +352,11 @@ func httpReason(body string) string {
 type errUnsupportedVersion struct{ version int }
 
 func (e errUnsupportedVersion) Error() string {
-	return fmt.Sprintf("hub chose protocol version %d; this node speaks %d to %d", e.version, proto.MinVersion, proto.Version)
+	msg := fmt.Sprintf("hub chose protocol version %d; this node speaks %d to %d", e.version, proto.MinVersion, proto.Version)
+	if e.version < proto.MinVersion {
+		msg += ": the hub is too old for this node; upgrade the hub"
+	}
+	return msg
 }
 
 // closeReason tells the hub whether a channel ended on purpose.
@@ -370,7 +381,7 @@ type event struct {
 	err     error
 }
 
-func serve(parent context.Context, conn *wire.Conn, hello *proto.Hello, mcps map[string]MCP, logger *slog.Logger, onState func(bool, error), queueLimit int, inFlight *atomic.Int64) error {
+func serve(parent context.Context, conn *wire.Conn, hello *proto.Hello, mcps map[string]MCP, logger *slog.Logger, onWelcome func(proto.Welcome), onState func(bool, error), queueLimit int, inFlight *atomic.Int64) error {
 	ctx, cancel := context.WithCancel(parent)
 	var workers sync.WaitGroup
 	channels := make(map[string]*channel)
@@ -394,6 +405,9 @@ func serve(parent context.Context, conn *wire.Conn, hello *proto.Hello, mcps map
 		return errUnsupportedVersion{v}
 	}
 	conn.SetPeerLimit(welcome.Welcome.MaxMessageSize)
+	if onWelcome != nil {
+		onWelcome(*welcome.Welcome)
+	}
 	if onState != nil {
 		onState(true, nil)
 	}

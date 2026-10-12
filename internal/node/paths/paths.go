@@ -47,6 +47,18 @@ func ToolCacheDir() (string, error) {
 	return filepath.Join(dir, "tools"), nil
 }
 
+// UpdateFile returns where the last check for newer releases is kept.
+func UpdateFile() (string, error) {
+	dir, err := StateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, UpdateFileName), nil
+}
+
+// UpdateFileName is UpdateFile's name in the state directory.
+const UpdateFileName = "update.json"
+
 func checkSocketPath(path string, limit int) (string, error) {
 	// sockaddr_un needs one byte for the terminating NUL on both supported OSes.
 	if len(path) > limit {

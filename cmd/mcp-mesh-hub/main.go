@@ -21,6 +21,7 @@ import (
 
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/auth"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/server"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 )
 
 var version = "dev"
@@ -86,6 +87,7 @@ func rootCmd() *cobra.Command {
 	f.BoolVar(&cfg.AllowInsecure, "allow-insecure", envBool("MCPMESH_ALLOW_INSECURE", false), "accept plain HTTP from public addresses (by default only loopback and private networks may use it)")
 	f.BoolVar(&cfg.Pairing, "pairing", envBool("MCPMESH_PAIRING", true), "let a node without a key ask to join; an admin approves it in the dashboard")
 	f.BoolVar(&cfg.MDNS, "mdns", envBool("MCPMESH_MDNS", true), "announce the hub on the local network")
+	f.BoolVar(&cfg.NoUpdateCheck, "no-update-check", envBool(update.EnvDisable, false), "don't check GitHub for newer mcp-mesh releases (the dashboard tells admins when one is out)")
 	f.StringVar(&cfg.Name, "name", env("MCPMESH_NAME", hostname), "hub name shown to nodes")
 	f.DurationVar(&cfg.CallTimeout, "call-timeout", envDuration("MCPMESH_CALL_TIMEOUT", 120*time.Second), "default tool call timeout")
 	f.StringVar(&cfg.logLevel, "log-level", env("MCPMESH_LOG_LEVEL", "info"), "debug, info, warn or error")

@@ -27,6 +27,8 @@ type Config struct {
 	NodeName string
 	LogLevel slog.Level
 	MCPs     []MCP
+	// NoUpdateCheck: update_check: false, don't ask GitHub for newer releases.
+	NoUpdateCheck bool
 }
 
 type Hub struct {
@@ -81,8 +83,9 @@ type rawConfig struct {
 	Node struct {
 		Name string `yaml:"name"`
 	} `yaml:"node"`
-	LogLevel string            `yaml:"log_level"`
-	MCPs     map[string]rawMCP `yaml:"mcps"`
+	LogLevel    string            `yaml:"log_level"`
+	UpdateCheck *bool             `yaml:"update_check"`
+	MCPs        map[string]rawMCP `yaml:"mcps"`
 }
 
 type rawMCP struct {
@@ -208,6 +211,7 @@ func Parse(data []byte, path string) (*Config, error) {
 	default:
 		return nil, source.error("log_level", errors.New("must be debug, info, warn or error"))
 	}
+	cfg.NoUpdateCheck = raw.UpdateCheck != nil && !*raw.UpdateCheck
 	for _, name := range sortedKeys(raw.MCPs) {
 		if !mcpNamePattern.MatchString(name) {
 			return nil, source.error("mcps."+name, errors.New("MCP name must match [A-Za-z0-9_-]+"))

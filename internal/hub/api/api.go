@@ -21,6 +21,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/catalog"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/known"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 )
 
 const (
@@ -78,6 +79,8 @@ type Options struct {
 	AdminLog AdminLog // nil: actions aren't logged, /admin-log answers 404
 	// Overrides is nil in tests: /overrides answers 404.
 	Overrides Overrides
+	// Updates knows the newest release; nil reports the check as off.
+	Updates Updates
 	// OAuthName names an OAuth client key's app (keys.oauth_client); nil
 	// when OAuth is off.
 	OAuthName func(clientID string) string
@@ -103,6 +106,12 @@ type Options struct {
 
 	Logger *slog.Logger  // nil = slog.Default()
 	Poll   time.Duration // event snapshot interval; 0 = 1s
+}
+
+// Updates is the check for newer releases.
+type Updates interface {
+	Enabled() bool
+	Status() update.Status
 }
 
 // Known remembers nodes that have connected.
@@ -174,6 +183,8 @@ func (s *Server) route(path string) (route, map[string]string, bool) {
 		return route{methods: m("GET", s.auditList)}, nil, true
 	case len(seg) == 1 && seg[0] == "stats":
 		return route{methods: m("GET", s.statsGet)}, nil, true
+	case len(seg) == 1 && seg[0] == "update":
+		return route{methods: m("GET", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.updateView()) })}, nil, true
 	case len(seg) == 1 && seg[0] == "health":
 		return route{methods: m("GET", s.healthGet)}, nil, true
 	case len(seg) == 1 && seg[0] == "approvals":

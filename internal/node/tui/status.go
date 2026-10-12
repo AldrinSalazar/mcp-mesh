@@ -19,6 +19,9 @@ func (m *model) titleBar() string {
 	}
 	left := m.badge() + "  " + m.bold(singleLine(name))
 	right := m.dim(singleLine(version))
+	if latest := s.Update.Latest; latest != "" {
+		right = m.warn("↑ "+singleLine(latest)+" available") + m.dim(" · ") + right
+	}
 	available := max(0, m.width-lipgloss.Width(right)-2)
 	left = ansi.Truncate(left, available, "…")
 	return left + strings.Repeat(" ", max(0, m.width-lipgloss.Width(left)-lipgloss.Width(right))) + right
@@ -179,6 +182,23 @@ func (m *model) guidance() []string {
 	} else if !h.Connected && h.LastError != "" {
 		// A node waiting for approval has no error: the notice says what to do.
 		lines = append(lines, "Hub: "+singleLine(h.LastError)+" · keeps retrying")
+	}
+	return append(lines, m.updateLines()...)
+}
+
+// updateLines say what to do about versions. The running node keeps its
+// binary until it restarts, so each says so.
+func (m *model) updateLines() []string {
+	u := m.snapshot.Update
+	var lines []string
+	switch {
+	case u.Latest != "":
+		lines = append(lines, m.warn("Update available: mcp-mesh-node "+singleLine(u.Latest)+".")+" Upgrade with "+m.bold(singleLine(u.Upgrade))+", then restart the node (S, then s).")
+	case u.Hub != "":
+		lines = append(lines, m.warn("The hub runs "+singleLine(u.Hub)+", newer than this node.")+" Upgrade with "+m.bold(singleLine(u.Upgrade))+", then restart the node (S, then s).")
+	}
+	if u.Running != "" {
+		lines = append(lines, m.warn("The node still runs "+singleLine(u.Running)+".")+" Restart it to use this "+singleLine(m.snapshot.Version)+" (S, then s).")
 	}
 	return lines
 }

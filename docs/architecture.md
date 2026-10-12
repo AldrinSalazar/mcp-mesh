@@ -30,6 +30,7 @@ flags into their configuration.
 | `internal/proto` | the node ↔ hub envelope types and protocol version |
 | `internal/wire` | envelopes over a WebSocket: framing, chunking, size limits, heartbeat |
 | `internal/discovery` | mDNS: the hub announces itself, nodes browse |
+| `internal/update` | release versions, and the daily check for a newer release that the hub and node show |
 | `internal/logx` | logging helpers |
 | **Node** | |
 | `cmd/mcp-mesh-node` | the CLI and the terminal dashboard's entry point |
@@ -109,7 +110,7 @@ as JSON over one WebSocket per node:
 | Envelope | Direction | Carries |
 | --- | --- | --- |
 | `hello` | node → hub | the node's name, version and the MCPs it offers (with cached tool lists) |
-| `welcome` | hub → node | the protocol version to use and the hub's message size limit |
+| `welcome` | hub → node | the protocol version to use, the hub's message size limit, and the hub's release version (for notices) |
 | `open` | hub → node | open channel `ch` on MCP `mcp` (for a per-client MCP, for which client) |
 | `opened` | node → hub | the channel is ready, or why it isn't |
 | `mcp` | both | one JSON-RPC message on channel `ch` |

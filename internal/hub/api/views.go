@@ -11,6 +11,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/catalog"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/trust"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 )
 
 type mcpView struct {
@@ -66,6 +67,44 @@ type nodeView struct {
 	MCPs           []mcpView  `json:"mcps"`
 	Trust          trustView  `json:"trust"`
 	PendingTools   int        `json:"pending_tools"`
+	// Outdated: the node runs a version older than the latest release, or,
+	// before the hub knows one, than the hub itself.
+	Outdated bool `json:"outdated"`
+}
+
+type updateView struct {
+	// Enabled is false when the check is off (opted out, or a dev build).
+	Enabled   bool   `json:"enabled"`
+	Version   string `json:"version"`
+	Latest    string `json:"latest"`
+	Available bool   `json:"update_available"`
+	// ReleaseURL is the latest release's page, with its notes.
+	ReleaseURL string     `json:"release_url"`
+	CheckedAt  *time.Time `json:"checked_at,omitempty"`
+}
+
+func (s *Server) updateView() updateView {
+	v := updateView{Version: s.opts.Version}
+	if s.opts.Updates == nil {
+		return v
+	}
+	st := s.opts.Updates.Status()
+	v.Enabled, v.Latest, v.Available, v.ReleaseURL = s.opts.Updates.Enabled(), st.Latest, st.Available, st.URL
+	if !st.CheckedAt.IsZero() {
+		v.CheckedAt = &st.CheckedAt
+	}
+	return v
+}
+
+// versionReference is what node versions are compared with: the latest
+// release, or the hub's own version until a check has found one.
+func (s *Server) versionReference() string {
+	if s.opts.Updates != nil {
+		if latest := s.opts.Updates.Status().Latest; latest != "" {
+			return latest
+		}
+	}
+	return s.opts.Version
 }
 
 type trustView struct {
@@ -175,6 +214,7 @@ func (s *Server) nodeViews() []nodeView {
 		pending[p.Node]++
 	}
 	listed := map[string]bool{}
+	reference := s.versionReference()
 	for _, n := range s.opts.Nodes.Nodes() {
 		mcps := make([]mcpView, 0, len(n.MCPs))
 		for _, m := range n.MCPs {
@@ -185,7 +225,8 @@ func (s *Server) nodeViews() []nodeView {
 		}
 		v := nodeView{Name: n.Name, NodeVersion: n.NodeVersion, OS: n.OS, RemoteAddr: n.RemoteAddr,
 			KeyID: n.KeyID, ConnectedAt: n.ConnectedAt, Online: n.Online, MCPs: mcps,
-			Trust: trustView{Level: trust.Trust, Approved: true}, PendingTools: pending[n.Name]}
+			Trust: trustView{Level: trust.Trust, Approved: true}, PendingTools: pending[n.Name],
+			Outdated: update.Behind(n.NodeVersion, reference)}
 		if s.opts.Trust != nil {
 			v.Trust = newTrustView(s.opts.Trust.Policy(n.Name))
 		}
@@ -209,7 +250,8 @@ func (s *Server) nodeViews() []nodeView {
 			}
 			at := k.LastSeen
 			v := nodeView{Name: k.Name, NodeVersion: k.NodeVersion, OS: k.OS, RemoteAddr: k.RemoteAddr, KeyID: k.KeyID,
-				DisconnectedAt: &at, MCPs: mcps, Trust: trustView{Level: trust.Trust, Approved: true}, PendingTools: pending[k.Name]}
+				DisconnectedAt: &at, MCPs: mcps, Trust: trustView{Level: trust.Trust, Approved: true}, PendingTools: pending[k.Name],
+				Outdated: update.Behind(k.NodeVersion, reference)}
 			if s.opts.Trust != nil {
 				v.Trust = newTrustView(s.opts.Trust.Policy(k.Name))
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -120,5 +121,24 @@ func TestNodeCommandHelp(t *testing.T) {
 	}
 	if strings.Contains(out, "Daemon:") {
 		t.Fatal("old help group")
+	}
+}
+
+func TestUpdateLines(t *testing.T) {
+	tests := []struct {
+		u    nodectl.UpdateState
+		want []string
+	}{
+		{nodectl.UpdateState{}, nil},
+		{nodectl.UpdateState{Latest: "v1.3.0", URL: "https://example/v1.3.0", Upgrade: "brew upgrade mcp-mesh-node"},
+			[]string{"Update available: v1.3.0 (https://example/v1.3.0); upgrade: brew upgrade mcp-mesh-node, then restart the node (mcp-mesh-node stop && mcp-mesh-node start)"}},
+		{nodectl.UpdateState{Hub: "v1.4.0", Upgrade: "brew upgrade mcp-mesh-node", Running: "v1.1.0"},
+			[]string{"The hub runs v1.4.0, newer than this node; upgrade: brew upgrade mcp-mesh-node, then restart the node",
+				"The running node is v1.1.0, older than this mcp-mesh-node; restart it to use the new one: mcp-mesh-node stop && mcp-mesh-node start"}},
+	}
+	for _, test := range tests {
+		if got := updateLines(test.u); !slices.Equal(got, test.want) {
+			t.Errorf("updateLines(%+v) = %q, want %q", test.u, got, test.want)
+		}
 	}
 }

@@ -111,3 +111,16 @@ export function approvalItems(nodes: readonly Node[], pending: readonly PendingT
   }
   return out
 }
+
+// outdatedItems is one line for the nodes that run an older version than
+// the latest release (or the hub), so their machines get upgraded.
+export function outdatedItems(nodes: readonly Node[]): ApprovalItem[] {
+  const old = nodes.filter((n) => n.outdated)
+  if (!old.length) return []
+  return [{
+    key: 'outdated',
+    title: `${plural(old.length, 'node runs', 'nodes run')} an older version`,
+    detail: old.map((n) => n.name).join(', '),
+    to: old.length === 1 ? { path: '/nodes', query: { node: old[0]!.name } } : { path: '/nodes' },
+  }]
+}

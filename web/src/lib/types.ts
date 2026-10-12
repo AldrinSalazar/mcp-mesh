@@ -13,6 +13,18 @@ export interface Info {
   started_at?: string
 }
 
+// UpdateInfo is GET /update: whether a newer mcp-mesh release is out.
+export interface UpdateInfo {
+  // enabled: false when the check is off (--no-update-check, or a dev build).
+  enabled: boolean
+  version: string
+  // latest: the newest release; empty until a check succeeds.
+  latest: string
+  update_available: boolean
+  release_url: string
+  checked_at?: string
+}
+
 export interface Session {
   username: string
   csrf: string
@@ -80,6 +92,9 @@ export interface Node {
   mcps: MCP[]
   trust: NodeTrust
   pending_tools: number
+  // outdated: the node runs an older version than the latest release (or,
+  // before the hub knows one, than the hub).
+  outdated?: boolean
 }
 
 // trust: every tool visible; review: changed tools wait for approval;

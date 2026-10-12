@@ -11,7 +11,7 @@ import { toast } from '@/lib/toast'
 import { refresh } from '@/lib/live'
 import { trustChoice, trustLabel, trustOptions, trustText } from '@/lib/trust'
 import type { TrustLevel } from '@/lib/types'
-import { agoLong, host, osLabel, plural, since } from '@/lib/format'
+import { agoLong, host, osLabel, plural, since, versionLabel } from '@/lib/format'
 import { live } from '@/lib/live'
 import { mcpStatus, nodeStatus, startLabel, transportLabel, type Tone } from '@/lib/status'
 import type { MCP, Node } from '@/lib/types'
@@ -69,7 +69,7 @@ const lifetime = computed(() => {
 })
 // Collapsed rows show just the span, as in the design.
 const shortLifetime = computed(() => lifetime.value.replace(/^Connected for /, ''))
-const sub = computed(() => [osLabel(props.node.os), props.expanded ? `node v${props.node.node_version}` : '', address.value].filter(Boolean).join(' · '))
+const sub = computed(() => [osLabel(props.node.os), props.expanded ? `node ${versionLabel(props.node.node_version)}` : '', address.value].filter(Boolean).join(' · '))
 
 // The key's name when the Keys list knows it (it won't with auth off).
 const keyName = computed(() => live.keys.find((k) => k.id === props.node.key_id)?.name ?? props.node.key_id)
@@ -100,6 +100,7 @@ const rows = computed<Row[]>(() =>
         <span class="sub mono truncate">{{ sub }}</span>
         <UiBadge v-if="!node.trust.approved" tone="warn" class="mini">Not approved</UiBadge>
         <UiBadge v-else-if="node.pending_tools > 0" tone="warn" class="mini">{{ node.pending_tools }} waiting</UiBadge>
+        <UiBadge v-else-if="node.outdated" tone="info" class="mini" :title="`Runs ${versionLabel(node.node_version)}; a newer mcp-mesh-node is out`">Update available</UiBadge>
       </span>
       <UiBadge :tone="status.tone" class="state">{{ status.label }}</UiBadge>
       <span class="span">{{ shortLifetime }}</span>
@@ -114,6 +115,7 @@ const rows = computed<Row[]>(() =>
           <button type="button" class="name truncate collapse" aria-expanded="true" :title="`Hide ${node.name}`" @click="emit('toggle')">{{ node.name }}</button>
           <span class="sub mono truncate">{{ sub }}</span>
           <span class="life">{{ lifetime }} · Trust: {{ trustLabel(node.trust.level) }}</span>
+          <span v-if="node.outdated" class="life upgrade">Update available. On {{ node.name }}, run <code>brew upgrade mcp-mesh-node</code> (or download the latest release), then restart the node.</span>
         </div>
         <UiBadge :tone="status.tone" class="state">{{ status.label }}</UiBadge>
         <span class="counts">{{ counts }}</span>
@@ -209,6 +211,7 @@ button.row:hover { background: color-mix(in srgb, var(--paper) 55%, transparent)
 .collapse:hover { text-decoration: underline; }
 .sub { max-width: 100%; font-size: 12px; color: var(--muted); }
 .life { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.upgrade { margin-top: 6px; color: var(--cobalt); white-space: normal; }
 .span, .counts { font-size: 13px; }
 .row.open .state, .row.open .counts { margin-top: 4px; }
 .row.open .state { align-self: start; justify-self: start; }

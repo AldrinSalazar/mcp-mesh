@@ -229,7 +229,7 @@ func (r *rig) send(conn *wire.Conn, e *proto.Envelope) {
 func (r *rig) welcome(conn *wire.Conn) *proto.Hello {
 	r.t.Helper()
 	hello := r.recv(conn, proto.THello, "").Hello
-	r.send(conn, &proto.Envelope{T: proto.TWelcome, Welcome: &proto.Welcome{Version: proto.Version, NodeID: "node-id", MaxMessageSize: proto.DefaultMaxMessageSize}})
+	r.send(conn, &proto.Envelope{T: proto.TWelcome, Welcome: &proto.Welcome{Version: proto.Version, NodeID: "node-id", MaxMessageSize: proto.DefaultMaxMessageSize, HubVersion: "v9.9.9"}})
 	return hello
 }
 
@@ -241,6 +241,30 @@ func (r *rig) open(conn *wire.Conn, name, ch string, up *fakeUpstream) *fakeConn
 		r.t.Fatalf("open failed: %+v", e)
 	}
 	return receive(r.t, r.ctx, up.opened)
+}
+
+func TestWelcomeCarriesHubVersion(t *testing.T) {
+	welcomes := make(chan proto.Welcome, 1)
+	connected := make(chan bool, 1)
+	r := newRig(t, Config{Node: "desk", MCPs: []MCP{{Name: "tools", Upstream: newUpstream(t)}},
+		OnWelcome: func(w proto.Welcome) {
+			select {
+			case <-connected:
+				t.Error("OnWelcome after OnConnState")
+			default:
+			}
+			welcomes <- w
+		},
+		OnConnState: func(c bool, _ error) {
+			if c {
+				connected <- c
+			}
+		}}, nil)
+	r.welcome(r.accept())
+	if w := receive(t, r.ctx, welcomes); w.HubVersion != "v9.9.9" {
+		t.Fatalf("hub version = %q", w.HubVersion)
+	}
+	receive(t, r.ctx, connected)
 }
 
 func TestHelloAndRoundTrip(t *testing.T) {

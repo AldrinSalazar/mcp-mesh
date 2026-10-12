@@ -560,7 +560,7 @@ func TestRegistryDisconnectWhileOpening(t *testing.T) {
 }
 
 func TestRegistryNegotiatesVersion(t *testing.T) {
-	_, _, url := newTestRegistry(t)
+	_, _, url := newTestRegistryOptions(t, Options{OfflineGrace: 500 * time.Millisecond, Version: "v1.4.0"})
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	conn, err := wire.Dial(ctx, url, nil, 0)
@@ -580,5 +580,9 @@ func TestRegistryNegotiatesVersion(t *testing.T) {
 	}
 	if e.Welcome.Version != proto.Version {
 		t.Fatalf("welcome version = %d, want %d", e.Welcome.Version, proto.Version)
+	}
+	// The hub's release version, for the node's notices.
+	if e.Welcome.HubVersion != "v1.4.0" {
+		t.Fatalf("welcome hub version = %q", e.Welcome.HubVersion)
 	}
 }

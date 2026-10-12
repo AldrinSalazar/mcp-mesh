@@ -22,6 +22,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/known"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 	"github.com/AldrinSalazar/mcp-mesh/internal/proto"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 )
 
 const (
@@ -1248,5 +1249,58 @@ func TestInfoHasStartTime(t *testing.T) {
 	decodeBody(t, e.do("GET", "/api/v1/info", "", anon), &info)
 	if !info.StartedAt.Equal(e.srv.opts.StartedAt) {
 		t.Fatalf("started_at = %v", info.StartedAt)
+	}
+}
+
+type fakeUpdates struct{ st update.Status }
+
+func (f fakeUpdates) Enabled() bool         { return true }
+func (f fakeUpdates) Status() update.Status { return f.st }
+
+func TestUpdateAndOutdatedNodes(t *testing.T) {
+	nodeList := []nodes.NodeInfo{
+		{Name: "a-old", NodeVersion: "v1.1.0", Online: true},
+		{Name: "b-hub", NodeVersion: "v1.2.0", Online: true},
+		{Name: "c-new", NodeVersion: "v1.3.0", Online: true},
+		{Name: "d-dev", NodeVersion: "dev", Online: true},
+	}
+	tests := []struct {
+		name     string
+		updates  Updates
+		want     updateView
+		outdated map[string]bool
+	}{
+		{"no check: compared with the hub", nil, updateView{Version: "v1.2.0"}, map[string]bool{"a-old": true}},
+		{"no release known yet: compared with the hub", fakeUpdates{update.Status{Current: "v1.2.0"}},
+			updateView{Enabled: true, Version: "v1.2.0"}, map[string]bool{"a-old": true}},
+		{"a newer release: compared with it", fakeUpdates{update.Status{Current: "v1.2.0", Latest: "v1.3.0", Available: true, URL: "https://example/v1.3.0"}},
+			updateView{Enabled: true, Version: "v1.2.0", Latest: "v1.3.0", Available: true, ReleaseURL: "https://example/v1.3.0"},
+			map[string]bool{"a-old": true, "b-hub": true}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fn := &fakeNodes{}
+			fn.set(nodeList)
+			srv := New(Options{Nodes: fn, Catalog: catalog.New(), Recent: activity.New(1), Version: "v1.2.0", Updates: test.updates})
+			h := srv.Handler()
+			get := func(path string, v any) {
+				w := httptest.NewRecorder()
+				h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+				wantStatus(t, w, 200)
+				decodeBody(t, w, v)
+			}
+			var got updateView
+			get("/api/v1/update", &got)
+			if got != test.want {
+				t.Errorf("update = %+v, want %+v", got, test.want)
+			}
+			var views []nodeView
+			get("/api/v1/nodes", &views)
+			for _, v := range views {
+				if v.Outdated != test.outdated[v.Name] {
+					t.Errorf("%s (%s): outdated = %v", v.Name, v.NodeVersion, v.Outdated)
+				}
+			}
+		})
 	}
 }

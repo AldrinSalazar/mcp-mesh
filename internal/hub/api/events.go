@@ -148,7 +148,7 @@ func (f *feed) unsubscribe(s *sub) {
 }
 
 func (s *Server) eventTypes() []string {
-	types := []string{"nodes", "tools", "prompts", "resources", "calls", "stats", "approvals", "settings"}
+	types := []string{"nodes", "tools", "prompts", "resources", "calls", "stats", "approvals", "settings", "update"}
 	if s.opts.Sessions != nil && s.opts.Keys != nil {
 		types = append(types, "keys", "pairings")
 	}
@@ -185,6 +185,8 @@ func (s *Server) snapshot(ctx context.Context, typ string) ([]byte, error) {
 		v = s.approvalViews()
 	case "settings":
 		v = s.settingsView()
+	case "update":
+		v = s.updateView()
 	case "overrides":
 		v, err = s.opts.Overrides.List(ctx)
 	case "groups":

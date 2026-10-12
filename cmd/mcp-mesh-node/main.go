@@ -16,6 +16,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/daemon"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/paths"
 	"github.com/AldrinSalazar/mcp-mesh/internal/node/service"
+	"github.com/AldrinSalazar/mcp-mesh/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -29,10 +30,10 @@ const notRunning = "the node is not running (start it with `mcp-mesh-node start`
 
 func rootCmd() *cobra.Command {
 	var configPath, socketPath string
-	var noInput bool
+	var noInput, noUpdateCheck bool
 	defaultConfig, configErr := paths.ConfigFile()
 	defaultSocket, socketErr := paths.SocketPath()
-	root := &cobra.Command{Use: "mcp-mesh-node", Short: "Manage MCP servers connected to an mcp-mesh hub", Version: version, SilenceUsage: true, Args: cobra.NoArgs,
+	root := &cobra.Command{Use: "mcp-mesh-node", Short: "Manage MCP servers connected to an mcp-mesh hub", Version: version + latestNote(), SilenceUsage: true, Args: cobra.NoArgs,
 		Long:    "Manage this machine’s MCP servers through one hub connection.\n\nGetting started:\n  mcp-mesh-node                      open the dashboard (does everything below)\n  mcp-mesh-node init --hub ws://HUB:7001/node\n  mcp-mesh-node add -- npx -y @modelcontextprotocol/server-filesystem ~/code\n  mcp-mesh-node add --name blender --url http://127.0.0.1:9876/mcp\n                                     connect to an app’s MCP and share it through the hub\n  mcp-mesh-node start                start the node now, until logout;\n                                     without a key it asks the hub to pair\n  mcp-mesh-node install              start it now and at every login",
 		Example: "  mcp-mesh-node",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -42,6 +43,10 @@ func rootCmd() *cobra.Command {
 			return cmd.Help()
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if noUpdateCheck {
+				// A daemon that start launches inherits it.
+				os.Setenv(update.EnvDisable, "1")
+			}
 			if cmd.Name() == "wrap" || cmd.Name() == "mcp-mesh-node" {
 				return nil
 			}
@@ -56,6 +61,7 @@ func rootCmd() *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&configPath, "config", defaultConfig, "node configuration path (MCPMESH_CONFIG)")
 	root.PersistentFlags().StringVar(&socketPath, "socket", defaultSocket, "node control socket (MCPMESH_SOCKET)")
+	root.PersistentFlags().BoolVar(&noUpdateCheck, "no-update-check", false, "don't check GitHub for newer releases ("+update.EnvDisable+"=1, or update_check: false in node.yaml)")
 	root.PersistentFlags().BoolVar(&noInput, "no-input", os.Getenv("MCPMESH_NO_INPUT") == "1", "disable interactive prompts (MCPMESH_NO_INPUT=1)")
 	root.AddGroup(&cobra.Group{ID: "setup", Title: "Setup:"}, &cobra.Group{ID: "node", Title: "Node:"}, &cobra.Group{ID: "mcps", Title: "MCPs:"})
 	root.AddCommand(wrapCmd())
@@ -80,9 +86,13 @@ func rootCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		updates, err := paths.UpdateFile()
+		if err != nil {
+			return err
+		}
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		return daemon.Run(ctx, daemon.Options{ConfigPath: configPath, SocketPath: socketPath, EnvFile: env, ToolCacheDir: cache, Version: version})
+		return daemon.Run(ctx, daemon.Options{ConfigPath: configPath, SocketPath: socketPath, EnvFile: env, ToolCacheDir: cache, UpdateFile: updates, Version: version})
 	})
 	var hub, initKey, initName string
 	var force bool
@@ -280,6 +290,21 @@ func rootCmd() *cobra.Command {
 	commandHelp(root)
 	return root
 }
+
+// latestNote is " (latest: v1.3.0)" when the node's last check found a
+// newer release, for --version.
+func latestNote() string {
+	file, err := paths.UpdateFile()
+	if err != nil || update.DisabledByEnv() {
+		return ""
+	}
+	cached, _ := update.FileCache{Path: file}.Load(context.Background())
+	if st := update.StatusOf(version, cached); st.Available {
+		return " (latest: " + st.Latest + ")"
+	}
+	return ""
+}
+
 func refreshEnv(ctx context.Context) error {
 	env, err := service.CaptureLoginEnv(ctx)
 	if err != nil {
