@@ -37,7 +37,7 @@ flags into their configuration.
 | `internal/node/tui` | the terminal dashboard (Bubble Tea), a client of the control API |
 | `internal/node/control` | the running node's local API on a Unix socket |
 | `internal/node/daemon` | the running node: config, supervisors, the hub connection, the control API |
-| `internal/node/agent` | the WebSocket to the hub: hello, channels, relaying, reconnects |
+| `internal/node/agent` | the WebSocket to the hub: hello, channels, relaying, reconnects, pairing |
 | `internal/node/supervisor` | one MCP's process: start, idle stop, crash backoff, logs |
 | `internal/node/upstream` | the connection to one MCP: stdio, Streamable HTTP, HTTP+SSE |
 | `internal/node/toolfilter` | `allow_tools`, and the tool lists the node caches |
@@ -48,6 +48,7 @@ flags into their configuration.
 | `cmd/mcp-mesh-hub` | flags, and the key and admin commands |
 | `internal/hub/server` | assembles everything behind the listeners |
 | `internal/hub/nodes` | the node endpoint, the registry, each MCP's session and lifecycle |
+| `internal/hub/pairing` | the pairing endpoint: nodes without a key waiting for an admin |
 | `internal/hub/catalog` | every MCP's tools, prompts and resources under their exposed names |
 | `internal/hub/gateway` | the MCP endpoint clients use (one MCP server per client key) |
 | `internal/hub/progress` | routes progress notifications to the client that made the call |
@@ -102,8 +103,8 @@ events.
 
 ![A tool call: the node connects and says hello, the hub opens a channel and initializes the MCP through it, a client calls a tool, and the call travels as mcp frames to the MCP and back](images/call.png)
 
-The node ↔ hub protocol has six envelope types, sent as JSON over one
-WebSocket per node:
+The node ↔ hub protocol has six envelope types for a connected node, sent
+as JSON over one WebSocket per node:
 
 | Envelope | Direction | Carries |
 | --- | --- | --- |
@@ -120,6 +121,15 @@ as binary chunks that take turns with other channels' frames, so a large
 result never holds up the node's other MCPs. Both ends ping every 20
 seconds and close the connection after two missed answers.
 
+A node without a key asks for one on a second endpoint, `/node/pair`,
+which needs no credential and carries three more envelopes: `pair` (node
+→ hub: the name it asks for, its host name and OS), `pairing` (hub → node:
+a code the dashboard shows next to the request) and, once an admin
+approves, `paired` (hub → node: a node key and the name it is bound to).
+The connection stays open while the request waits; an admin who declines
+closes it with code 4005. The node then saves the key and connects to
+`/node` as usual.
+
 ## Who can do what
 
 ![Access checkpoints: the credential checked at each listener, what a client key may see (groups and trust), and allow_tools on the node](images/access.png)
@@ -128,6 +138,10 @@ seconds and close the connection after two missed answers.
   bound to their name; clients present a client key or an OAuth token;
   admins sign in with a password and every change they make carries a CSRF
   token. Plain HTTP is accepted only from loopback and private networks.
+- **A node without a key gets one only from an admin.** Its pairing
+  request only waits; an admin compares the code it shows with the one in
+  the dashboard and approves it. Waiting requests are capped, in total and
+  per address.
 - **A client sees a tool only if its groups grant it and the node's trust
   level allows it.** Calls check again, so a hidden tool is never callable.
   A tool whose definition changed after approval is hidden until an admin

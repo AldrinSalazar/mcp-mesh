@@ -233,26 +233,45 @@ For a client key, `setup` is:
 
 `GET /keys/{id}/tools` is the key's effective tool list: what that client sees right now (its groups' grants and approvals), in the `GET /tools` format. 400 for a node key.
 
+### Pairing requests
+
+Nodes started without a key that ask to join (see [Pairing](hub.md#pairing)). Auth on only; 404 with auth off.
+
+`GET /pairings`, oldest first (`[]` with pairing turned off):
+
+```json
+[{"id":"p_3f9a1c2e7b4d5a60","node":"render-box","hostname":"render-box.lan","os":"linux","node_version":"1.0.0",
+  "ip":"192.168.1.52","code":"K7Q-4MX","requested":"2026-10-10T08:00:00Z","name_taken":false}]
+```
+
+`node` is the name the machine asked for and `code` what it shows on its screen. `name_taken` is true when a node key is bound to that name already.
+
+`POST /pairings/{id}/approve` creates a node key and sends it to the waiting machine, which saves it and connects: 200 `{"key":{...}}` (the secret is never shown). An optional body `{"name":"studio","replace":true}` names the node otherwise than it asked; `replace` is needed when a node key is bound to the name, and revokes that key (its node disconnects) first, else 409. 400 for a bad name; 404 when the request is gone (approved or declined already, or the machine disconnected); 410 when the machine disconnected while the key was being sent, in which case the key is revoked again. 404 `pairing is turned off on this hub` with `--pairing=false`.
+
+`DELETE /pairings/{id}` declines the request: 204. The machine is told and doesn't ask again until it restarts. 404 when it is gone.
+
 ### Settings
 
 `GET /settings`:
 
 ```json
-{"trust_default":"trust","oauth":{"enabled":true,"issuer":"https://hub.example:7002","resource":"https://hub.example:7002/mcp"}}
+{"trust_default":"trust","oauth":{"enabled":true,"issuer":"https://hub.example:7002","resource":"https://hub.example:7002/mcp"},"pairing":true}
 ```
+
+`pairing` says whether machines without a key may ask to join (`--pairing`).
 
 `PUT /settings` with `{"trust_default":"review"}` changes the level of nodes without their own: 200 with the settings.
 
 ### `GET /admin-log`
 
-Who changed what: sign-ins (and failed attempts), keys, admin users, groups, trust levels and approvals, OAuth authorizations. Query parameters `before_id` and `limit` (default 100, at most 1000) page like `/audit`.
+Who changed what: sign-ins (and failed attempts), keys, admin users, groups, trust levels and approvals, OAuth authorizations, pairing requests. Query parameters `before_id` and `limit` (default 100, at most 1000) page like `/audit`.
 
 ```json
 {"entries":[{"id":12,"time":"2026-10-10T08:00:00Z","actor":"alice","action":"key.create","target":"k_1a2b3c4d","detail":"node laptop","ip":"10.0.0.5"}],
  "next_before_id":0}
 ```
 
-`actor` is the admin's username, `cli` for the hub's command line, or empty for a failed sign-in. Actions: `sign_in`, `sign_in_failed`, `sign_out`, `key.create`, `key.revoke`, `key.groups`, `admin.create`, `admin.delete`, `admin.password`, `group.create`, `group.update`, `group.delete`, `trust.level`, `node.approve`, `tool.approve`, `oauth.authorize`, `oauth.denied`. `oauth.authorize` is recorded when the app redeems its code (that is when the key is made or reused), with the approving admin as actor and the key as target.
+`actor` is the admin's username, `cli` for the hub's command line, or empty for a failed sign-in. Actions: `sign_in`, `sign_in_failed`, `sign_out`, `key.create`, `key.revoke`, `key.groups`, `admin.create`, `admin.delete`, `admin.password`, `group.create`, `group.update`, `group.delete`, `trust.level`, `node.approve`, `tool.approve`, `oauth.authorize`, `oauth.denied`, `pairing.approve` (target: the key created; detail: `node <name> from <address>`), `pairing.deny` (target: the name the machine asked for; detail: its address). Replacing a key while approving a pairing also records its `key.revoke`. `oauth.authorize` is recorded when the app redeems its code (that is when the key is made or reused), with the approving admin as actor and the key as target.
 
 ### Admins
 
@@ -280,6 +299,6 @@ event: calls
 data: [...]
 ```
 
-Types: `nodes`, `tools`, `prompts`, `resources`, `calls`, `stats`, `approvals`, `settings`, `overrides`, and when auth is on `keys`, `admins` and `groups`. The hub checks for changes about once a second (`calls` therefore shows the most recent ~N calls, as `GET /calls` does). A comment line `: ping` is sent every 25 seconds to keep the connection alive.
+Types: `nodes`, `tools`, `prompts`, `resources`, `calls`, `stats`, `approvals`, `settings`, `overrides`, and when auth is on `keys`, `admins`, `groups` and `pairings`. The hub checks for changes about once a second (`calls` therefore shows the most recent ~N calls, as `GET /calls` does). A comment line `: ping` is sent every 25 seconds to keep the connection alive.
 
 A client that falls too far behind is disconnected rather than slowing the others; `EventSource` reconnects by itself and receives a full snapshot again. The same happens when the hub restarts. The stream needs the session cookie like any other endpoint; if the session ends, reconnection gets 401 and the client should show sign-in.

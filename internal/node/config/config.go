@@ -36,6 +36,17 @@ type Hub struct {
 	AllowInsecure bool
 }
 
+// CheckKeyTransport refuses a hub URL that would carry the node key in
+// clear text across networks the user doesn't control: ws:// to a host
+// that isn't local, unless AllowInsecure. Pairing receives the key the
+// same way it is later sent, so it applies there too.
+func (h Hub) CheckKeyTransport() error {
+	if u, err := url.Parse(h.URL); err == nil && u.Scheme == "ws" && !h.AllowInsecure && !localHost(u.Hostname()) {
+		return fmt.Errorf("ws:// would send the node key unencrypted to %s; use wss:// or set hub.allow_insecure: true", u.Hostname())
+	}
+	return nil
+}
+
 type MCP struct {
 	Name        string
 	Transport   proto.Transport
@@ -166,8 +177,8 @@ func Parse(data []byte, path string) (*Config, error) {
 	}
 	cfg.Hub.AllowInsecure = raw.Hub.AllowInsecure
 	if key != "" {
-		if u, err := url.Parse(cfg.Hub.URL); err == nil && u.Scheme == "ws" && !cfg.Hub.AllowInsecure && !localHost(u.Hostname()) {
-			return nil, source.error("hub.url", fmt.Errorf("ws:// would send the node key unencrypted to %s; use wss:// or set hub.allow_insecure: true", u.Hostname()))
+		if err := cfg.Hub.CheckKeyTransport(); err != nil {
+			return nil, source.error("hub.url", err)
 		}
 		cfg.Hub.Header.Set("Authorization", "Bearer "+key)
 	}

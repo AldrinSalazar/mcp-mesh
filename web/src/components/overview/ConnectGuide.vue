@@ -1,12 +1,18 @@
 <script setup lang="ts">
-// Fresh hub: three steps to get the first machine and agent connected.
+// Fresh hub: the steps to get the first machine and agent connected. With
+// pairing on, a machine joins by asking and being approved; otherwise it
+// needs a node key made here first.
+import { computed } from 'vue'
 import { Plus } from 'lucide-vue-next'
-import type { Info, KeyKind } from '@/lib/types'
+import type { Info, KeyKind, PairingRequest } from '@/lib/types'
 import UiButton from '@/components/ui/UiButton.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import CopyField from '@/components/ui/CopyField.vue'
+import { pairCommand } from '@/lib/snippets'
 
-defineProps<{ info: Info | null; authOff: boolean }>()
+const props = withDefaults(defineProps<{ info: Info | null; authOff: boolean; pairing?: boolean; requests?: PairingRequest[] }>(), { requests: () => [] })
 const emit = defineEmits<{ key: [kind: KeyKind] }>()
+const pairs = computed(() => !props.authOff && props.pairing)
 </script>
 
 <template>
@@ -14,20 +20,46 @@ const emit = defineEmits<{ key: [kind: KeyKind] }>()
     <div class="art" aria-hidden="true"><span class="circle" /><span class="square"><span class="hole" /></span></div>
     <h2 id="guide-title" class="title">Connect your first machine</h2>
     <ol class="steps">
-      <li>
-        <span class="num mono">01</span>
-        <div>
-          <h3>{{ authOff ? 'Install the node' : 'Create a node key' }}</h3>
-          <p>{{ authOff ? 'Run mcp-mesh-node on the machine that has your MCPs.' : 'Bind it to the machine’s name, like workstation.' }}</p>
-        </div>
-      </li>
-      <li>
-        <span class="num mono">02</span>
-        <div>
-          <h3>{{ authOff ? 'Point it at the node URL' : 'Run the setup command' }}</h3>
-          <p>{{ authOff ? 'Nodes connect to the node URL below directly; no key is needed.' : 'Run the mcp-mesh-node init command it shows on that machine: it sets the hub, the machine’s name and the key.' }}</p>
-        </div>
-      </li>
+      <template v-if="pairs">
+        <li>
+          <span class="num mono">01</span>
+          <div class="step">
+            <h3>Start the node on that machine</h3>
+            <p>Install mcp-mesh-node on the machine that has your MCPs, then run:</p>
+            <CopyField v-if="info" :value="pairCommand(info.node_url)" label="Copy setup command" class="cmd" />
+          </div>
+        </li>
+        <li>
+          <span class="num mono">02</span>
+          <div>
+            <h3>Approve it here</h3>
+            <p>It asks to join and shows a code. Under Approvals, check the code matches and approve it: no key to copy.</p>
+            <ul v-if="requests.length" class="asking">
+              <li v-for="r in requests" :key="r.id">
+                <span class="who truncate">{{ r.node }} is asking to join</span>
+                <span class="mono code">{{ r.code }}</span>
+                <RouterLink to="/approvals" class="arrow-link">Review</RouterLink>
+              </li>
+            </ul>
+          </div>
+        </li>
+      </template>
+      <template v-else>
+        <li>
+          <span class="num mono">01</span>
+          <div>
+            <h3>{{ authOff ? 'Install the node' : 'Create a node key' }}</h3>
+            <p>{{ authOff ? 'Run mcp-mesh-node on the machine that has your MCPs.' : 'Bind it to the machine’s name, like workstation.' }}</p>
+          </div>
+        </li>
+        <li>
+          <span class="num mono">02</span>
+          <div>
+            <h3>{{ authOff ? 'Point it at the node URL' : 'Run the setup command' }}</h3>
+            <p>{{ authOff ? 'Nodes connect to the node URL below directly; no key is needed.' : 'Run the mcp-mesh-node init command it shows on that machine: it sets the hub, the machine’s name and the key.' }}</p>
+          </div>
+        </li>
+      </template>
       <li>
         <span class="num mono">03</span>
         <div>
@@ -37,8 +69,14 @@ const emit = defineEmits<{ key: [kind: KeyKind] }>()
       </li>
     </ol>
     <div v-if="!authOff" class="buttons">
-      <UiButton variant="primary" :icon="Plus" @click="emit('key', 'node')">Create a node key</UiButton>
-      <UiButton @click="emit('key', 'client')">Create a client key</UiButton>
+      <template v-if="pairs">
+        <UiButton variant="primary" :icon="Plus" @click="emit('key', 'client')">Create a client key</UiButton>
+        <UiButton @click="emit('key', 'node')">Use a node key instead</UiButton>
+      </template>
+      <template v-else>
+        <UiButton variant="primary" :icon="Plus" @click="emit('key', 'node')">Create a node key</UiButton>
+        <UiButton @click="emit('key', 'client')">Create a client key</UiButton>
+      </template>
     </div>
   </section>
   <footer v-if="info" class="urls">
@@ -59,6 +97,13 @@ const emit = defineEmits<{ key: [kind: KeyKind] }>()
 h3 { font-size: 18px; }
 .buttons > * { min-width: 232px; }
 .steps p { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.step { min-width: 0; flex: 1; max-width: 640px; }
+.cmd { margin-top: 12px; }
+.asking { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.asking li { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--warn-soft); border-radius: var(--radius); font-size: 13px; min-width: 0; }
+.asking .who { color: var(--ink); font-weight: 500; }
+.asking .code { color: var(--cobalt); letter-spacing: 0.08em; }
+.asking .arrow-link { margin-left: auto; }
 .buttons { display: flex; gap: 16px; margin-top: 64px; flex-wrap: wrap; }
 .art { position: absolute; top: 56px; right: 56px; width: 166px; height: 176px; }
 .circle { position: absolute; left: 0; top: 0; width: 132px; height: 132px; border-radius: 50%; background: var(--cobalt-soft); }

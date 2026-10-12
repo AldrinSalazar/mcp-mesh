@@ -39,8 +39,17 @@ func (m *model) noticeLines() []string {
 			errors = append(errors, item[0]+": "+singleLine(item[1]))
 		}
 	}
-	if s.Daemon.Running && !s.Daemon.Status.Hub.Connected && s.Daemon.Status.Hub.LastError != "" {
-		errors = append(errors, "Hub disconnected: "+singleLine(s.Daemon.Status.Hub.LastError))
+	hub := s.Daemon.Status.Hub
+	switch {
+	case !s.Daemon.Running || hub.Connected:
+	case hub.PairCode != "":
+		// A request waiting for an admin is not an error, and says what to do.
+		if text != "" {
+			text += " · "
+		}
+		text += m.accent("Waiting for approval: approve this machine in the hub's dashboard (Approvals); check it shows code " + m.bold(singleLine(hub.PairCode)))
+	case hub.LastError != "":
+		errors = append(errors, "Hub disconnected: "+singleLine(hub.LastError))
 	}
 	if len(errors) > 0 {
 		if text != "" {

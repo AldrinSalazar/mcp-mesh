@@ -20,6 +20,8 @@ const actions: Record<string, string> = {
   'tool.approve': 'Approved tools',
   'oauth.authorize': 'Authorized an app',
   'oauth.denied': 'Denied an app',
+  'pairing.approve': 'Approved a machine',
+  'pairing.deny': 'Declined a machine',
 }
 
 export function actionLabel(action: string): string {
@@ -44,7 +46,8 @@ export function targetView(
   keys: readonly Pick<Key, 'id' | 'name'>[],
 ): TargetView {
   const detail = e.detail
-  if (e.action.startsWith('key.')) {
+  // An approved pairing's target is the key it created.
+  if (e.action.startsWith('key.') || e.action === 'pairing.approve') {
     const k = keys.find((x) => x.id === e.target)
     if (k) return { text: [k.name, detail].filter(Boolean).join(' · '), mono: false }
     return { text: [e.target, detail].filter(Boolean).join(' · '), mono: true }

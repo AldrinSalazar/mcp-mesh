@@ -1,7 +1,7 @@
 // Numbers behind the Overview cards. Kept free of Vue so it can be tested.
 import { mcpStatus } from '@/lib/status'
 import { percent, plural } from '@/lib/format'
-import type { Node, PendingTool, Stats, Tool } from '@/lib/types'
+import type { Node, PairingRequest, PendingTool, Stats, Tool } from '@/lib/types'
 
 export interface McpGroups {
   running: number
@@ -78,11 +78,17 @@ export interface ApprovalItem {
   to: { path: string; query?: Record<string, string> }
 }
 
-// approvalItems lists what waits for an admin: nodes that are not approved,
-// then one line for the tools waiting (the nodes' own tools are part of the
-// node's line, so they are not counted twice).
-export function approvalItems(nodes: readonly Node[], pending: readonly PendingTool[]): ApprovalItem[] {
-  const out: ApprovalItem[] = []
+// approvalItems lists what waits for an admin: machines asking to join,
+// nodes that are not approved, then one line for the tools waiting (the
+// nodes' own tools are part of the node's line, so they are not counted
+// twice).
+export function approvalItems(nodes: readonly Node[], pending: readonly PendingTool[], pairings: readonly PairingRequest[] = []): ApprovalItem[] {
+  const out: ApprovalItem[] = pairings.map((p) => ({
+    key: `pairing/${p.id}`,
+    title: `${p.node} asks to join`,
+    detail: `Code ${p.code} · ${p.ip}`,
+    to: { path: '/approvals' },
+  }))
   const unapproved = new Set<string>()
   for (const n of nodes) {
     if (n.trust.approved) continue

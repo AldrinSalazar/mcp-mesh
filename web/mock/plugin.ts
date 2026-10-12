@@ -5,7 +5,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import * as fx from './fixtures.ts'
-import type { AdminLogEntry, ApprovalRef, AuditEntry, Group, Key, Node, PendingTool, Settings, Tool, ToolOverride, TrustLevel } from '../src/lib/types.ts'
+import type { AdminLogEntry, ApprovalRef, AuditEntry, Group, Key, Node, PairingRequest, PendingTool, Settings, Tool, ToolOverride, TrustLevel } from '../src/lib/types.ts'
 
 export function mockApi(mode: string): Plugin {
   const empty = mode === 'empty'
@@ -20,6 +20,7 @@ export function mockApi(mode: string): Plugin {
     admins: structuredClone(fx.admins),
     groups: (empty ? structuredClone(fx.groups.slice(0, 1)).map((g) => ({ ...g, keys: [] })) : structuredClone(fx.groups)) as Group[],
     approvals: (empty ? [] : structuredClone(fx.approvals)) as PendingTool[],
+    pairings: (empty ? [] : structuredClone(fx.pairings)) as PairingRequest[],
     settings: structuredClone(fx.settings) as Settings,
     overrides: (empty ? [] : structuredClone(fx.overrides)) as ToolOverride[],
     adminLog: (empty ? [] : structuredClone(fx.adminLog)) as AdminLogEntry[],
@@ -36,11 +37,13 @@ export function mockApi(mode: string): Plugin {
     const recent = st.audit.filter((e) => Date.parse(e.time) >= since)
     return { calls_last_hour: recent.length, errors_last_hour: recent.filter((e) => e.outcome !== 'ok').length }
   }
+  // A request's name is taken while a node key is bound to it.
+  const pairingViews = () => st.pairings.map((p) => ({ ...p, name_taken: st.keys.some((k) => k.kind === 'node' && k.name === p.node) }))
   const keyViews = () => st.keys.map((k) => (k.kind === 'client' ? { ...k, groups: st.groups.filter((g) => g.keys.includes(k.id)).map((g) => g.id) } : k))
   const snapshot = (type: string): unknown =>
     ({
       nodes: st.nodes, tools: st.tools, prompts: st.prompts, resources: st.resources, calls: calls(), stats: stats(), keys: keyViews(), admins: st.admins,
-      groups: st.groups, approvals: st.approvals, settings: st.settings, overrides: st.overrides,
+      groups: st.groups, approvals: st.approvals, settings: st.settings, overrides: st.overrides, pairings: pairingViews(),
     })[type]
   const log = (action: string, target: string, detail = '') => {
     st.adminLog.unshift({ id: (st.adminLog[0]?.id ?? 0) + 1, time: new Date().toISOString(), actor: st.session || 'admin', action, target, detail, ip: '127.0.0.1' })
@@ -124,7 +127,7 @@ export function mockApi(mode: string): Plugin {
 
         if (path === '/events') {
           res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' })
-          const types = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'approvals', 'settings', 'overrides', ...(authOn ? ['keys', 'admins', 'groups'] : [])]
+          const types = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'approvals', 'settings', 'overrides', ...(authOn ? ['keys', 'admins', 'groups', 'pairings'] : [])]
           const send = (type: string) => {
             if (types.includes(type)) res.write(`event: ${type}\ndata: ${JSON.stringify(snapshot(type))}\n\n`)
           }
@@ -237,7 +240,38 @@ export function mockApi(mode: string): Plugin {
           const page = list.slice(0, limit)
           return json(res, 200, { entries: page, next_before_id: page.length === limit ? page[page.length - 1]!.id : 0 })
         }
-        if (!authOn && (path.startsWith('/keys') || path.startsWith('/admins'))) return err(res, 404, 'auth is off')
+        if (!authOn && (path.startsWith('/keys') || path.startsWith('/admins') || path.startsWith('/pairings'))) return err(res, 404, 'auth is off')
+        if (path === '/pairings' && m === 'GET') return json(res, 200, pairingViews())
+        const pairing = path.match(/^\/pairings\/([^/]+)(\/approve)?$/)
+        if (pairing && ((m === 'POST' && pairing[2]) || (m === 'DELETE' && !pairing[2]))) {
+          const i = st.pairings.findIndex((p) => p.id === decodeURIComponent(pairing[1]!))
+          if (i < 0) return err(res, 404, 'no such pairing request; the machine may have disconnected')
+          const p = st.pairings[i]!
+          if (m === 'DELETE') {
+            st.pairings.splice(i, 1)
+            log('pairing.deny', p.node, p.ip)
+            emit('pairings')
+            return json(res, 204)
+          }
+          const b = (await body(req)) as { name?: string; replace?: boolean }
+          const name = (b.name ?? '').trim() || p.node
+          if (/\s/.test(name) || name.length > 64) return err(res, 400, `name ${JSON.stringify(name)} contains whitespace or control characters`)
+          const old = st.keys.filter((k) => k.kind === 'node' && k.name === name)
+          if (old.length && !b.replace) return err(res, 409, `a node key for ${JSON.stringify(name)} already exists; replace it (its node disconnects) or choose another name`)
+          for (const k of old) {
+            st.keys.splice(st.keys.indexOf(k), 1)
+            for (const n of st.nodes) if (n.key_id === k.id && n.online) Object.assign(n, { online: false, disconnected_at: new Date().toISOString() })
+            log('key.revoke', k.id, `node ${k.name}`)
+          }
+          const key: Key = { id: 'k_' + Math.random().toString(16).slice(2, 10), kind: 'node', name, created: new Date().toISOString() }
+          st.keys.push(key)
+          st.pairings.splice(i, 1)
+          log('pairing.approve', key.id, `node ${name} from ${p.ip}`)
+          emit('pairings')
+          emit('keys')
+          emit('nodes')
+          return json(res, 200, { key })
+        }
         if (path === '/groups') {
           if (m === 'GET') return json(res, 200, st.groups)
           const b = (await body(req)) as { name?: string; description?: string; grants?: Group['grants'] }

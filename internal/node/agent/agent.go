@@ -65,6 +65,9 @@ type Config struct {
 	// node and with false (and the reason) when that connection ends or a
 	// connection attempt fails.
 	OnConnState func(connected bool, err error)
+	// Pairing, if set, lets a node the hub turns away for having no key ask
+	// for one. Once paired the node connects with the new key and name.
+	Pairing *Pairing
 }
 
 type options struct {
@@ -138,8 +141,10 @@ func run(ctx context.Context, cfg Config, opts options) error {
 		}
 		mcps[m.Name] = m
 	}
+	// Pairing replaces both.
+	node, header := cfg.Node, cfg.Header
 	newHello := func() *proto.Hello {
-		h := &proto.Hello{Version: proto.Version, Node: cfg.Node, NodeVersion: cfg.Version, OS: runtime.GOOS, MCPs: make([]proto.MCP, 0, len(cfg.MCPs))}
+		h := &proto.Hello{Version: proto.Version, Node: node, NodeVersion: cfg.Version, OS: runtime.GOOS, MCPs: make([]proto.MCP, 0, len(cfg.MCPs))}
 		for _, c := range cfg.MCPs {
 			m := mcps[c.Name]
 			d := proto.MCP{Name: m.Name, Transport: m.Upstream.Transport(), Sharing: m.Sharing, Start: m.Start,
@@ -153,11 +158,12 @@ func run(ctx context.Context, cfg Config, opts options) error {
 	}
 	backoff := opts.minBackoff
 	rejectionLogged := false
+	pairDenied := false
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		conn, err := wire.Dial(ctx, cfg.HubURL, cfg.Header, cfg.MaxMessageSize)
+		conn, err := wire.Dial(ctx, cfg.HubURL, header, cfg.MaxMessageSize)
 		if err == nil {
 			started := time.Now()
 			err = serve(ctx, conn, newHello(), mcps, cfg.Logger, cfg.OnConnState, opts.queueLimit, cfg.InFlight)
@@ -171,7 +177,27 @@ func run(ctx context.Context, cfg Config, opts options) error {
 		rejected := false
 		if reason, ok := keyRejection(err); ok {
 			rejected = true
-			err = &KeyRejectedError{Reason: reason, Node: cfg.Node, HasKey: cfg.Header.Get("Authorization") != ""}
+			rk := &KeyRejectedError{Reason: reason, Node: node, HasKey: header.Get("Authorization") != ""}
+			err = rk
+			if !rk.HasKey && cfg.Pairing != nil {
+				// Not reported as a rejection yet: the node is about to ask
+				// for a key, and OnCode says when the request waits.
+				paired, perr := runPairing(ctx, cfg, node, pairDenied)
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				if perr == nil {
+					node, header = paired.Node, header.Clone()
+					if header == nil {
+						header = make(http.Header)
+					}
+					header.Set("Authorization", "Bearer "+paired.Key)
+					backoff, rejectionLogged = opts.minBackoff, false
+					continue
+				}
+				pairDenied = pairDenied || errors.Is(perr, ErrPairingDenied)
+				rk.Pairing = perr
+			}
 		}
 		if cfg.OnConnState != nil {
 			cfg.OnConnState(false, err)
@@ -215,10 +241,18 @@ type KeyRejectedError struct {
 	Node   string
 	// HasKey is false when the node sent no key at all.
 	HasKey bool
+	// Pairing is why asking the hub for a key failed (ErrPairingDenied when
+	// an admin declined); nil if the node didn't ask.
+	Pairing error
 }
 
 func (e *KeyRejectedError) Error() string {
-	if !e.HasKey {
+	switch {
+	case !e.HasKey && errors.Is(e.Pairing, ErrPairingDenied):
+		return fmt.Sprintf("%v; restart the node to ask again, or create a key on the hub with mcp-mesh-hub key create node %s, then mcp-mesh-node key set <key>", e.Pairing, e.Node)
+	case !e.HasKey && e.Pairing != nil:
+		return fmt.Sprintf("hub requires a node key, and pairing failed: %v. Create one on the hub with mcp-mesh-hub key create node %s, then mcp-mesh-node key set <key>", e.Pairing, e.Node)
+	case !e.HasKey:
 		return fmt.Sprintf("hub requires a node key; create one on the hub with mcp-mesh-hub key create node %s, then mcp-mesh-node key set <key>", e.Node)
 	}
 	reason := e.Reason
@@ -231,12 +265,46 @@ func (e *KeyRejectedError) Error() string {
 // Short is the reason without the advice, for a status card.
 func (e *KeyRejectedError) Short() string {
 	switch {
+	case !e.HasKey && errors.Is(e.Pairing, ErrPairingDenied):
+		return "pairing declined"
 	case !e.HasKey:
 		return "no key set"
 	case e.Reason == "":
 		return "unauthorized"
 	}
 	return e.Reason
+}
+
+// runPairing asks the hub for a key, unless this node may not or an admin
+// already declined.
+func runPairing(ctx context.Context, cfg Config, node string, denied bool) (*proto.Paired, error) {
+	p := cfg.Pairing
+	switch {
+	case denied:
+		return nil, ErrPairingDenied
+	case p.Refused != nil:
+		return nil, p.Refused
+	}
+	cfg.Logger.Info("no node key; asking the hub to pair", "hub", cfg.HubURL, "node", node)
+	paired, err := pair(ctx, cfg.HubURL, pairRequest(node, cfg.Version, p.Hostname), func(code string) {
+		if code != "" {
+			cfg.Logger.Info("waiting for an admin to approve this machine in the hub's dashboard (Approvals)", "code", code, "node", node)
+		}
+		if p.OnCode != nil {
+			p.OnCode(code)
+		}
+	})
+	if err != nil {
+		// run logs it with the key rejection it explains.
+		return nil, err
+	}
+	cfg.Logger.Info("paired with the hub", "node", paired.Node)
+	if p.Save != nil {
+		if err := p.Save(paired.Node, paired.Key); err != nil {
+			cfg.Logger.Error("the hub's key could not be saved; this node uses it until it stops, then must pair again", "error", err)
+		}
+	}
+	return paired, nil
 }
 
 // keyRejection recognizes the two ways the hub says no to a key.

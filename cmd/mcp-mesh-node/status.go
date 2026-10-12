@@ -59,6 +59,11 @@ func hubKeyState(s nodectl.Snapshot) hubKeyJSON {
 	return hubKeyJSON{}
 }
 
+// pairingHint tells the user what to do with a pairing code.
+func pairingHint(code string) string {
+	return fmt.Sprintf("approve this machine in the hub's dashboard (Approvals); check it shows code %s", code)
+}
+
 func printStatus(cmd *cobra.Command, s nodectl.Snapshot, asJSON bool) error {
 	if asJSON {
 		var status *control.Status
@@ -103,9 +108,13 @@ func printStatus(cmd *cobra.Command, s nodectl.Snapshot, asJSON bool) error {
 	}
 	hub, state, hubErr := s.Config.Hub, "node stopped", ""
 	if s.Daemon.Running {
-		hub, state, hubErr = s.Daemon.Status.Hub.URL, "disconnected", s.Daemon.Status.Hub.LastError
-		if s.Daemon.Status.Hub.Connected {
+		h := s.Daemon.Status.Hub
+		hub, state, hubErr = h.URL, "disconnected", h.LastError
+		switch {
+		case h.Connected:
 			state = "connected"
+		case h.PairCode != "":
+			state, hubErr = "waiting for approval", pairingHint(h.PairCode)
 		}
 	}
 	fmt.Fprintf(out, "Hub: %s (%s)", hub, state)

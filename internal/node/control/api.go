@@ -51,6 +51,10 @@ type HubStatus struct {
 	KeyRejected bool `json:"keyRejected,omitempty"`
 	// KeyReason is the short why for a card ("key revoked", "no key set").
 	KeyReason string `json:"keyReason,omitempty"`
+	// PairCode is set while the node, which has no key, waits for an admin
+	// to approve it in the hub's dashboard: the code shown next to the
+	// request there.
+	PairCode string `json:"pairCode,omitempty"`
 }
 
 // MCPState is where an MCP's process is in its lifecycle.

@@ -1,7 +1,7 @@
 // Fixture hub state for `npm run dev:mock`, modelled on the Penpot mockups
 // (home-lab with workstation, mac-mini, laptop and studio-pc). Times are
 // relative to when the dev server starts.
-import type { Prompt, ResourceItem, Admin, AdminLogEntry, AuditEntry, Call, Group, Info, Key, Node, NodeTrust, PendingTool, Settings, Tool, ToolOverride } from '../src/lib/types.ts'
+import type { Prompt, ResourceItem, Admin, AdminLogEntry, AuditEntry, Call, Group, Info, Key, Node, NodeTrust, PairingRequest, PendingTool, Settings, Tool, ToolOverride } from '../src/lib/types.ts'
 
 const t0 = Date.now()
 const ago = (ms: number) => new Date(t0 - ms).toISOString()
@@ -211,7 +211,14 @@ export const groups: Group[] = [
 export const settings: Settings = {
   trust_default: 'trust',
   oauth: { enabled: true, issuer: 'https://mesh.home-lab.local', resource: info.client_url },
+  pairing: true,
 }
+
+// Machines started without a key, waiting for an admin.
+export const pairings: PairingRequest[] = [
+  { id: 'p_3f9a1c2e7b4d5a60', node: 'render-box', hostname: 'render-box.lan', os: 'linux', node_version: '1.0.0', ip: '192.168.1.52', code: 'K7Q-4MX', requested: ago(40_000), name_taken: false },
+  { id: 'p_8c2d4e6f1a3b5c7d', node: 'laptop', hostname: 'anas-macbook.local', os: 'darwin', node_version: '1.0.0', ip: '192.168.1.61', code: 'R3W-9TH', requested: ago(3 * min), name_taken: true },
+]
 
 export const adminLog: AdminLogEntry[] = [
   ['admin', 'oauth.authorize', 'k_o1a2b3c4', 'Claude', 3 * min],

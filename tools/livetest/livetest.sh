@@ -21,6 +21,7 @@ failures=0
 
 cleanup() {
 	"$sbx/bin/mcp-mesh-node" stop >/dev/null 2>&1 || true
+	XDG_CONFIG_HOME="$sbx/pair/cfg" XDG_STATE_HOME="$sbx/pair/state" XDG_RUNTIME_DIR="$sbx/pair/run" "$sbx/bin/mcp-mesh-node" stop >/dev/null 2>&1 || true
 	for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
 	wait 2>/dev/null || true
 	if [[ ${KEEP:-} == 1 || $failures -gt 0 ]]; then
@@ -439,8 +440,34 @@ eventually_ok 20 "hub refuses the node" "node refused" cat "$sbx/hub.log"
 eventually_ok 20 "node status says its key was rejected" "rejected" node status
 run "stop the node again" node stop
 
-if grep -Eq 'panic|DATA RACE' "$sbx/hub.log" "$sbx/state/mcp-mesh/node.log" 2>/dev/null; then
-	fail "no panics in logs" "$(grep -Eh 'panic|DATA RACE' "$sbx/hub.log" "$sbx/state/mcp-mesh/node.log" | head -3)"
+echo "a machine without a key pairs"
+# A second machine: its own config, state and socket.
+mkdir -p "$sbx"/pair/{cfg,state,run}
+pairnode() { timeout 60 env XDG_CONFIG_HOME="$sbx/pair/cfg" XDG_STATE_HOME="$sbx/pair/state" XDG_RUNTIME_DIR="$sbx/pair/run" "$sbx/bin/mcp-mesh-node" "$@"; }
+expect_ok "init without a key says the node will ask to pair" "asks the hub to pair" pairnode init --hub ws://127.0.0.1:7101/node --name livetest-desk
+run "add an MCP to the second machine" pairnode add --name cli -- "$sbx/bin/fakeapp" stdio
+start_out=$(pairnode start 2>&1) || true
+pair_code=$(grep -Eo 'code [A-Z0-9]{3}-[A-Z0-9]{3}' <<<"$start_out" | cut -d' ' -f2)
+if [[ -n $pair_code ]]; then pass "start prints the pairing code"; else fail "start prints the pairing code" "got: ${start_out:0:300}"; fi
+expect_ok "status shows the code too" "waiting for approval.*$pair_code" pairnode status
+api_login || fail "API sign-in for pairing" "no CSRF token"
+expect_ok "the dashboard lists the request with the same code" "\"node\":\"livetest-desk\".*\"code\":\"$pair_code\"" api GET /pairings
+pair_id=$(api GET /pairings | grep -Eo '"id":"p_[0-9a-f]+"' | head -1 | cut -d'"' -f4)
+expect_ok "approving it under another name creates its key" '^200' api POST "/pairings/$pair_id/approve" '{"name":"livetest-paired"}'
+eventually_ok 20 "the paired node's tools are listed under the new name" "livetest-paired__cli__render" call
+expect_ok "the paired node runs under the new name" "isError=false\): rendered paired" call livetest-paired__cli__render '{"scene":"paired"}'
+expect_ok "it saved the key" "Hub key: set" pairnode status
+expect_ok "it saved the name" "name: livetest-paired" cat "$sbx/pair/cfg/mcp-mesh/node.yaml"
+expect_ok "the approval is in the admin log" "pairing.approve" api GET /admin-log
+run "restart the paired node" pairnode stop
+run "start it again with its saved key" pairnode start
+# Its tools stay listed through the offline grace period; a call needs it back.
+eventually_ok 20 "it reconnects without pairing again" "isError=false\): rendered again" call livetest-paired__cli__render '{"scene":"again"}'
+expect_ok "no request waits after that" '^\[\]$' api GET /pairings
+run "stop the paired node" pairnode stop
+
+if grep -Eq 'panic|DATA RACE' "$sbx/hub.log" "$sbx/state/mcp-mesh/node.log" "$sbx/pair/state/mcp-mesh/node.log" 2>/dev/null; then
+	fail "no panics in logs" "$(grep -Eh 'panic|DATA RACE' "$sbx/hub.log" "$sbx/state/mcp-mesh/node.log" "$sbx/pair/state/mcp-mesh/node.log" 2>/dev/null | head -3)"
 else
 	pass "no panics in logs"
 fi

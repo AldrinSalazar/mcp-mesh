@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { approvalItems, callsLine, groupMcps, groupsLine, metrics, nodesLine } from './summary'
-import type { MCP, Node, PendingTool, Tool } from '@/lib/types'
+import type { MCP, Node, PairingRequest, PendingTool, Tool } from '@/lib/types'
 
 const mcp = (over: Partial<MCP>): MCP => ({
   name: 'x', transport: 'stdio', sharing: 'shared', start: 'lazy', state: 'ready', error: '',
@@ -55,5 +55,11 @@ describe('approvalItems', () => {
     const items = approvalItems([...nodes, nas], [pend('nas'), pend('nas'), pend('nas'), pend('mac'), pend('mac')])
     expect(items.map((i) => i.title)).toEqual(['nas waits for approval', '2 tools waiting for approval'])
     expect(items[1]!.detail).toBe('mac')
+  })
+  it('puts machines asking to join first', () => {
+    const p: PairingRequest = { id: 'p_1', node: 'render-box', hostname: '', os: 'linux', node_version: '', ip: '10.0.0.9', code: 'K7Q-4MX', requested: '', name_taken: false }
+    const items = approvalItems(nodes, [pend('mac')], [p])
+    expect(items.map((i) => i.title)).toEqual(['render-box asks to join', '1 tool waiting for approval'])
+    expect(items[0]).toMatchObject({ key: 'pairing/p_1', detail: 'Code K7Q-4MX · 10.0.0.9', to: { path: '/approvals' } })
   })
 })

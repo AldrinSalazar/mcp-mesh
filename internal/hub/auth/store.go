@@ -139,7 +139,9 @@ func queryKeys(ctx context.Context, q querier, where string, args ...any) ([]Key
 	return keys, rows.Err()
 }
 
-func validName(name string) error {
+// ValidName checks a key's name: a node key's is the node name it is bound
+// to.
+func ValidName(name string) error {
 	switch {
 	case name == "":
 		return errors.New("name is empty")
@@ -176,7 +178,7 @@ func (s *Store) create(kind Kind, name, oauthClient string) (string, Key, error)
 	if !validKind(kind) {
 		return "", Key{}, fmt.Errorf("unknown key kind %q (want node or client)", kind)
 	}
-	if err := validName(name); err != nil {
+	if err := ValidName(name); err != nil {
 		return "", Key{}, err
 	}
 	secret, err := NewSecret(kind)

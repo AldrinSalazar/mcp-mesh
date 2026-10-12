@@ -3,11 +3,11 @@
 // never polls. The session (and whether auth is on) lives here too.
 import { reactive, ref, onScopeDispose, getCurrentScope } from 'vue'
 import { api, setCSRF, setUnauthorizedHandler } from './api'
-import type { Admin, Call, Group, Info, Key, Node, PendingTool, Prompt, ResourceItem, Settings, Stats, Tool, ToolOverride } from './types'
+import type { Admin, Call, Group, Info, Key, Node, PairingRequest, PendingTool, Prompt, ResourceItem, Settings, Stats, Tool, ToolOverride } from './types'
 
 export type Connection = 'connecting' | 'live' | 'reconnecting'
 
-type Kind = 'nodes' | 'tools' | 'prompts' | 'resources' | 'calls' | 'stats' | 'keys' | 'admins' | 'groups' | 'approvals' | 'settings' | 'overrides'
+type Kind = 'nodes' | 'tools' | 'prompts' | 'resources' | 'calls' | 'stats' | 'keys' | 'admins' | 'groups' | 'approvals' | 'pairings' | 'settings' | 'overrides'
 
 const state = reactive({
   info: null as Info | null,
@@ -28,12 +28,14 @@ const state = reactive({
   admins: [] as Admin[],
   groups: [] as Group[],
   approvals: [] as PendingTool[],
+  // pairings: machines asking to join (auth on only).
+  pairings: [] as PairingRequest[],
   settings: null as Settings | null,
   overrides: [] as ToolOverride[],
   // loaded says which lists have arrived at least once, for loading states.
   loaded: {
     nodes: false, tools: false, prompts: false, resources: false, calls: false, stats: false, keys: false, admins: false,
-    groups: false, approvals: false, settings: false, overrides: false,
+    groups: false, approvals: false, pairings: false, settings: false, overrides: false,
   } as Record<Kind, boolean>,
 })
 
@@ -146,12 +148,13 @@ function clearData() {
   state.admins = []
   state.groups = []
   state.approvals = []
+  state.pairings = []
   state.settings = null
   state.overrides = []
   for (const k of Object.keys(state.loaded) as Kind[]) state.loaded[k] = false
 }
 
-const kinds: Kind[] = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'keys', 'admins', 'groups', 'approvals', 'settings', 'overrides']
+const kinds: Kind[] = ['nodes', 'tools', 'prompts', 'resources', 'calls', 'stats', 'keys', 'admins', 'groups', 'approvals', 'pairings', 'settings', 'overrides']
 
 // start opens the events stream. Safe to call again; it keeps one stream.
 export function start(): void {
@@ -219,7 +222,7 @@ export function stop(): void {
 
 // refresh refetches one list now, for screens that just changed it and
 // shouldn't wait for the next event.
-export async function refresh(kind: 'keys' | 'admins' | 'prompts' | 'resources' | 'groups' | 'approvals' | 'nodes' | 'settings' | 'tools' | 'overrides'): Promise<void> {
+export async function refresh(kind: 'keys' | 'admins' | 'prompts' | 'resources' | 'groups' | 'approvals' | 'pairings' | 'nodes' | 'settings' | 'tools' | 'overrides'): Promise<void> {
   const at = lifecycle
   const mine = ++ticket
   try {
@@ -241,6 +244,7 @@ function fetchKind(kind: Kind): Promise<unknown> {
     case 'admins': return api.admins()
     case 'groups': return api.groups()
     case 'approvals': return api.approvals()
+    case 'pairings': return api.pairings()
     case 'nodes': return api.nodes()
     case 'tools': return api.tools()
     case 'prompts': return api.prompts()
@@ -258,6 +262,12 @@ export function useNow(every = 1000) {
   const t = setInterval(() => (now.value = Date.now()), every)
   if (getCurrentScope()) onScopeDispose(() => clearInterval(t))
   return now
+}
+
+// waitingCount is everything that waits for an admin on the Approvals
+// screen: machines asking to join and tools held back.
+export function waitingCount(): number {
+  return state.approvals.length + state.pairings.length
 }
 
 // hubName is how the hub is called on screen: its network name, else host.

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"reflect"
 	"sort"
@@ -249,7 +250,9 @@ func (d *backend) start(cfg *config.Config) {
 	}
 	go func() {
 		defer close(rt.agentDone)
-		err := agent.Run(agentCtx, agent.Config{HubURL: cfg.Hub.URL, Node: cfg.NodeName, Version: d.opts.Version, Header: cfg.Hub.Header, MCPs: mcps, Logger: d.logger, OnConnState: d.connectionState, InFlight: &d.inFlight})
+		hostname, _ := os.Hostname()
+		pairing := &agent.Pairing{Hostname: hostname, OnCode: d.pairCode, Save: d.savePaired, Refused: cfg.Hub.CheckKeyTransport()}
+		err := agent.Run(agentCtx, agent.Config{HubURL: cfg.Hub.URL, Node: cfg.NodeName, Version: d.opts.Version, Header: cfg.Hub.Header, MCPs: mcps, Logger: d.logger, OnConnState: d.connectionState, InFlight: &d.inFlight, Pairing: pairing})
 		d.connectionState(false, err)
 		if err != nil && agentCtx.Err() == nil {
 			select {
@@ -276,6 +279,9 @@ func (d *backend) connectionState(connected bool, err error) {
 	}
 	d.hub.Connected = connected
 	d.hub.LastError, d.hub.KeyRejected, d.hub.KeyReason = "", false, ""
+	if connected {
+		d.hub.PairCode = ""
+	}
 	var rejected *agent.KeyRejectedError
 	if errors.As(err, &rejected) {
 		d.hub.KeyRejected, d.hub.KeyReason = true, rejected.Short()
@@ -290,6 +296,53 @@ func (d *backend) connectionState(connected bool, err error) {
 		d.logger.Info("hub disconnected", "error", err)
 	}
 	d.publish(control.Event{Kind: control.EventStatus})
+}
+
+// pairCode shows the code of the pairing request waiting on the hub ("" once
+// it ends).
+func (d *backend) pairCode(code string) {
+	d.mu.Lock()
+	d.hub.PairCode = code
+	d.mu.Unlock()
+	d.publish(control.Event{Kind: control.EventStatus})
+}
+
+// savePaired writes the key a pairing brought, and the node name the hub
+// bound it to, into node.yaml. The agent already uses both, so the daemon
+// records them as what it runs with: status doesn't ask for a reload, unless
+// other changes were already waiting.
+func (d *backend) savePaired(node, key string) error {
+	path := d.opts.ConfigPath
+	d.mu.Lock()
+	current, loaded := d.cfg, d.loadedHash
+	d.mu.Unlock()
+	before, err := fileHash(path)
+	if err != nil {
+		return err
+	}
+	if node != current.NodeName {
+		if err := config.SetNodeName(path, node); err != nil {
+			return err
+		}
+	}
+	if _, err := config.StoreKey(path, key); err != nil {
+		return err
+	}
+	next := *current
+	next.NodeName = node
+	next.Hub.Header = current.Hub.Header.Clone()
+	if next.Hub.Header == nil {
+		next.Hub.Header = make(http.Header)
+	}
+	next.Hub.Header.Set("Authorization", "Bearer "+key)
+	d.mu.Lock()
+	d.cfg = &next
+	d.mu.Unlock()
+	if before == loaded {
+		d.noteLoaded()
+	}
+	d.publish(control.Event{Kind: control.EventStatus})
+	return nil
 }
 
 func (d *backend) Status() control.Status {

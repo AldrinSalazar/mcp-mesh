@@ -38,6 +38,7 @@ import (
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/nodes"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/oauth"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/overrides"
+	"github.com/AldrinSalazar/mcp-mesh/internal/hub/pairing"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/progress"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/store"
 	"github.com/AldrinSalazar/mcp-mesh/internal/hub/trust"
@@ -65,6 +66,9 @@ type Config struct {
 	DataDir       string // hub.db lives here
 	Auth          bool
 	AllowInsecure bool
+	// Pairing lets a node without a key ask to join; an admin approves it
+	// in the dashboard (auth on only).
+	Pairing bool
 	// TrustedProxies are reverse proxies whose X-Forwarded-For and
 	// X-Forwarded-Proto are believed (client address and HTTPS).
 	TrustedProxies []netip.Prefix
@@ -357,6 +361,12 @@ func Run(ctx context.Context, cfg Config) error {
 	registry := nodes.NewRegistry(registryOpts)
 	gw = gateway.New(gatewayOpts)
 	apiOpts.Nodes = registry
+	var pairings *pairing.Manager
+	if cfg.Auth && cfg.Pairing {
+		pairings = pairing.New(pairing.Options{Logger: log.With("component", "pairing"), ClientIP: auth.ClientIP})
+		apiOpts.Pairing = pairings
+		apiOpts.DisconnectKey = func(id string) { registry.DisconnectKey(id) }
+	}
 	apiOpts.Health = func(ctx context.Context) api.Health {
 		return health(ctx, db, keys, audit, registry, gw)
 	}
@@ -374,6 +384,16 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	nodeMux := http.NewServeMux()
 	nodeMux.Handle("GET "+proto.NodePath, auth.LocalOrTLS(cfg.AllowInsecure, nodeHandler))
+	switch {
+	case pairings != nil:
+		// No key needed: this is how a node without one asks for one.
+		nodeMux.Handle("GET "+proto.PairPath, auth.LocalOrTLS(cfg.AllowInsecure, pairings))
+	case cfg.Auth:
+		// Say why, so the node can tell the user instead of a bare 404.
+		nodeMux.HandleFunc("GET "+proto.PairPath, func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "pairing is turned off on this hub (--pairing=false); create a node key in the dashboard", http.StatusForbidden)
+		})
+	}
 	clientMux := http.NewServeMux()
 	clientMux.Handle("/mcp", auth.LocalOrTLS(cfg.AllowInsecure, clientHandler))
 	if oauthSrv != nil {
@@ -437,6 +457,7 @@ func Run(ctx context.Context, cfg Config) error {
 		hubMux := http.NewServeMux()
 		hubMux.Handle("/", adminMux)
 		hubMux.Handle("GET "+proto.NodePath, nodeMux)
+		hubMux.Handle("GET "+proto.PairPath, nodeMux)
 		hubMux.Handle("/mcp", clientMux)
 		hubMux.Handle("/.well-known/", clientMux)
 		hubMux.Handle("/oauth/", clientMux)
@@ -591,7 +612,11 @@ func logKeyHint(keys *auth.Store, cfg Config, log *slog.Logger) error {
 		has[k.Kind] = true
 	}
 	if !has[auth.KindNode] || !has[auth.KindClient] {
-		log.Info("no node or client keys yet; create them with: mcp-mesh-hub key create node <node-name>, mcp-mesh-hub key create client <label>", "data_dir", cfg.DataDir)
+		hint := "no node or client keys yet; create them with: mcp-mesh-hub key create node <node-name>, mcp-mesh-hub key create client <label>"
+		if cfg.Pairing {
+			hint += "; a node started without a key asks to pair, and you approve it in the dashboard (Approvals)"
+		}
+		log.Info(hint, "data_dir", cfg.DataDir)
 	}
 	return nil
 }

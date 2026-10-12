@@ -23,4 +23,11 @@ describe('adminlog', () => {
     expect(targetView({ action: 'sign_in_failed', target: '', detail: '' }, keys)).toEqual({ text: '—', mono: false })
     expect(targetView({ action: 'trust.level', target: 'nas', detail: 'approve' }, keys)).toEqual({ text: 'nas · approve', mono: false })
   })
+  it('shows pairings', () => {
+    expect(actionLabel('pairing.approve')).toBe('Approved a machine')
+    expect(actionLabel('pairing.deny')).toBe('Declined a machine')
+    // An approval's target is the key it created.
+    expect(targetView({ action: 'pairing.approve', target: 'k_1', detail: 'node laptop from 10.0.0.9' }, [{ id: 'k_1', name: 'laptop' }]))
+      .toEqual({ text: 'laptop · node laptop from 10.0.0.9', mono: false })
+  })
 })

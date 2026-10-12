@@ -397,6 +397,8 @@ func (s *Server) approvalsApprove(w http.ResponseWriter, r *http.Request) {
 type settingsView struct {
 	TrustDefault trust.Level `json:"trust_default"`
 	OAuth        oauthView   `json:"oauth"`
+	// Pairing: nodes without a key may ask to join (--pairing).
+	Pairing bool `json:"pairing"`
 }
 
 type oauthView struct {
@@ -406,7 +408,7 @@ type oauthView struct {
 }
 
 func (s *Server) settingsView() settingsView {
-	v := settingsView{TrustDefault: trust.Trust, OAuth: oauthView{Enabled: s.opts.OAuthIssuer != ""}}
+	v := settingsView{TrustDefault: trust.Trust, OAuth: oauthView{Enabled: s.opts.OAuthIssuer != ""}, Pairing: s.opts.Pairing != nil}
 	if s.opts.Trust != nil {
 		v.TrustDefault = s.opts.Trust.Default()
 	}
