@@ -387,18 +387,3 @@ func TestPerClientAndCallTimeout(t *testing.T) {
 		t.Errorf("shared = %+v", sh)
 	}
 }
-
-func TestUpdateCheck(t *testing.T) {
-	for _, tc := range []struct {
-		yaml string
-		off  bool
-	}{
-		{"", false},
-		{"update_check: true\n", false},
-		{"update_check: false\n", true},
-	} {
-		if cfg := mustParse(t, "hub: {url: ws://localhost/node}\n"+tc.yaml); cfg.NoUpdateCheck != tc.off {
-			t.Errorf("%q: NoUpdateCheck = %v", tc.yaml, cfg.NoUpdateCheck)
-		}
-	}
-}

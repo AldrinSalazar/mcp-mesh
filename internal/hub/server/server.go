@@ -83,9 +83,6 @@ type Config struct {
 	AdminUser     string
 	AdminPassword string
 
-	// NoUpdateCheck stops the hub from asking GitHub for newer releases.
-	NoUpdateCheck bool
-
 	Version string
 	Logger  *slog.Logger // nil means slog.Default()
 	// OnListen, if set, receives the bound admin, node and client addresses
@@ -309,8 +306,7 @@ func Run(ctx context.Context, cfg Config) error {
 		},
 	}
 	updates := update.New(update.Options{
-		Current: cfg.Version, Disabled: cfg.NoUpdateCheck,
-		Cache: settingsCache{db}, Logger: log.With("component", "update"),
+		Current: cfg.Version, Cache: settingsCache{db}, Logger: log.With("component", "update"),
 	})
 	apiOpts := api.Options{
 		Catalog:       cat,

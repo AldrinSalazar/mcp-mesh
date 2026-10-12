@@ -128,8 +128,8 @@ func TestCheck(t *testing.T) {
 	}
 }
 
-func TestDevBuildsAndOptOutNeverAsk(t *testing.T) {
-	for _, opts := range []Options{{Current: "dev"}, {Current: "abc1234"}, {Current: "v1.2.0", Disabled: true}} {
+func TestDevBuildsNeverAsk(t *testing.T) {
+	for _, opts := range []Options{{Current: "dev"}, {Current: "abc1234"}} {
 		srv, hits := releases(t, "v1.3.0", nil)
 		opts.URL = srv.URL + "/releases"
 		c := New(opts)

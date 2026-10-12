@@ -35,8 +35,8 @@ type Options struct {
 	EnvFile      string
 	ToolCacheDir string
 	Version      string
-	// UpdateFile caches the check for newer releases; empty turns the
-	// check off.
+	// UpdateFile caches the check for newer releases; empty keeps the
+	// answer in memory only.
 	UpdateFile string
 	Logger     *slog.Logger
 	// DrainTimeout bounds how long a reload that reconnects to the hub waits
@@ -139,10 +139,12 @@ func Run(ctx context.Context, opts Options) error {
 	d := &backend{opts: opts, ctx: ownerCtx, cfg: cfg, level: level, logger: logger, started: time.Now(), subscribers: make(map[chan control.Event]struct{}), failed: make(chan error, 1), shutdown: make(chan struct{}, 1)}
 	hup, stopSignals := reloadSignals()
 	defer stopSignals()
-	// Read once: update_check takes effect when the daemon restarts.
+	var updateCache update.Cache
+	if opts.UpdateFile != "" {
+		updateCache = update.FileCache{Path: opts.UpdateFile}
+	}
 	d.updates = update.New(update.Options{
-		Current: opts.Version, Disabled: opts.UpdateFile == "" || cfg.NoUpdateCheck || update.DisabledByEnv(),
-		Cache: update.FileCache{Path: opts.UpdateFile}, Logger: logger.With("component", "update"),
+		Current: opts.Version, Cache: updateCache, Logger: logger.With("component", "update"),
 		Upgrade:  update.NodeUpgrade(update.Executable()),
 		OnChange: func(update.Status) { d.publish(control.Event{Kind: control.EventStatus}) },
 	})

@@ -76,8 +76,6 @@ type UpdateState struct {
 
 type ConfigState struct {
 	Exists bool
-	// NoUpdateCheck: update_check: false.
-	NoUpdateCheck bool
 	// Err is the load or validation error, with file and line where known.
 	// Empty when the file is valid or missing.
 	Err  string
@@ -237,11 +235,9 @@ func (n *Node) Inspect(ctx context.Context) Snapshot {
 // daemon's check keeps it), the running node and its hub.
 func (n *Node) updateState(ctx context.Context, s Snapshot) UpdateState {
 	var u UpdateState
-	if !s.Config.NoUpdateCheck && !update.DisabledByEnv() {
-		cached, _ := update.FileCache{Path: filepath.Join(n.opts.StateDir, paths.UpdateFileName)}.Load(ctx)
-		if st := update.StatusOf(n.opts.Version, cached); st.Available {
-			u.Latest, u.URL = st.Latest, st.URL
-		}
+	cached, _ := update.FileCache{Path: filepath.Join(n.opts.StateDir, paths.UpdateFileName)}.Load(ctx)
+	if st := update.StatusOf(n.opts.Version, cached); st.Available {
+		u.Latest, u.URL = st.Latest, st.URL
 	}
 	running := n.opts.Version
 	if s.Daemon.Running {

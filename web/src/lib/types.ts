@@ -15,7 +15,7 @@ export interface Info {
 
 // UpdateInfo is GET /update: whether a newer mcp-mesh release is out.
 export interface UpdateInfo {
-  // enabled: false when the check is off (--no-update-check, or a dev build).
+  // enabled: false for a build without a release version (dev), which never checks.
   enabled: boolean
   version: string
   // latest: the newest release; empty until a check succeeds.

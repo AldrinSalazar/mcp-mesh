@@ -298,7 +298,7 @@ Whether a newer mcp-mesh release is out, from the hub's daily check.
  "release_url":"https://github.com/AldrinSalazar/mcp-mesh/releases/tag/v1.3.0","checked_at":"2026-10-12T09:00:00Z"}
 ```
 
-`enabled` is false when the check is off (`--no-update-check`, or a build without a release version); `latest` is empty until a check succeeds, and `checked_at` is then omitted.
+`enabled` is false for a build without a release version (`dev`), which never checks; `latest` is empty until a check succeeds, and `checked_at` is then omitted.
 
 ### `GET /events` (Server-Sent Events)
 

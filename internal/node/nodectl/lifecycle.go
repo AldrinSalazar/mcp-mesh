@@ -47,7 +47,7 @@ func (n *Node) configState() ConfigState {
 	if err != nil {
 		state.Err = err.Error()
 	} else {
-		state.Hub, state.Node, state.NoUpdateCheck = cfg.Hub.URL, cfg.NodeName, cfg.NoUpdateCheck
+		state.Hub, state.Node = cfg.Hub.URL, cfg.NodeName
 	}
 	// Read apart from validation so a bad key file still shows as configured.
 	state.Key, _ = config.HubKey(n.opts.ConfigPath)

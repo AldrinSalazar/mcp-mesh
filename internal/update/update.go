@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,19 +28,10 @@ const (
 	ReleasesURL = "https://api.github.com/repos/AldrinSalazar/mcp-mesh/releases"
 	// DefaultInterval is how often a Checker asks.
 	DefaultInterval = 24 * time.Hour
-	// EnvDisable turns the check off for both binaries when set to a true
-	// value ("1", "true").
-	EnvDisable = "MCPMESH_NO_UPDATE_CHECK"
 	// retryAfter is how soon a failed check is retried.
 	retryAfter = time.Hour
 	timeout    = 10 * time.Second
 )
-
-// DisabledByEnv reports whether EnvDisable turns the check off.
-func DisabledByEnv() bool {
-	b, err := strconv.ParseBool(os.Getenv(EnvDisable))
-	return err == nil && b
-}
 
 // Release is a published release.
 type Release struct {
@@ -94,11 +84,9 @@ type Options struct {
 	// Current is the running build's version. A build without one ("dev")
 	// never checks.
 	Current string
-	// Disabled turns the check off (an opt-out flag or setting).
-	Disabled bool
-	Cache    Cache  // nil keeps the State in memory only
-	URL      string // the releases API; empty means ReleasesURL
-	Client   *http.Client
+	Cache   Cache  // nil keeps the State in memory only
+	URL     string // the releases API; empty means ReleasesURL
+	Client  *http.Client
 	// Interval between checks; zero means DefaultInterval.
 	Interval time.Duration
 	Logger   *slog.Logger // nil means slog.Default()
@@ -134,10 +122,11 @@ func New(opts Options) *Checker {
 		opts.Logger = slog.Default()
 	}
 	cur, ok := Parse(opts.Current)
-	return &Checker{opts: opts, log: opts.Logger, current: cur, enabled: ok && !opts.Disabled}
+	return &Checker{opts: opts, log: opts.Logger, current: cur, enabled: ok}
 }
 
-// Enabled reports whether the Checker checks at all.
+// Enabled reports whether the Checker checks at all: a build without a
+// release version doesn't.
 func (c *Checker) Enabled() bool { return c.enabled }
 
 // Status returns what is known now.

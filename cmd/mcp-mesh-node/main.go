@@ -30,7 +30,7 @@ const notRunning = "the node is not running (start it with `mcp-mesh-node start`
 
 func rootCmd() *cobra.Command {
 	var configPath, socketPath string
-	var noInput, noUpdateCheck bool
+	var noInput bool
 	defaultConfig, configErr := paths.ConfigFile()
 	defaultSocket, socketErr := paths.SocketPath()
 	root := &cobra.Command{Use: "mcp-mesh-node", Short: "Manage MCP servers connected to an mcp-mesh hub", Version: version + latestNote(), SilenceUsage: true, Args: cobra.NoArgs,
@@ -43,10 +43,6 @@ func rootCmd() *cobra.Command {
 			return cmd.Help()
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if noUpdateCheck {
-				// A daemon that start launches inherits it.
-				os.Setenv(update.EnvDisable, "1")
-			}
 			if cmd.Name() == "wrap" || cmd.Name() == "mcp-mesh-node" {
 				return nil
 			}
@@ -61,7 +57,6 @@ func rootCmd() *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&configPath, "config", defaultConfig, "node configuration path (MCPMESH_CONFIG)")
 	root.PersistentFlags().StringVar(&socketPath, "socket", defaultSocket, "node control socket (MCPMESH_SOCKET)")
-	root.PersistentFlags().BoolVar(&noUpdateCheck, "no-update-check", false, "don't check GitHub for newer releases ("+update.EnvDisable+"=1, or update_check: false in node.yaml)")
 	root.PersistentFlags().BoolVar(&noInput, "no-input", os.Getenv("MCPMESH_NO_INPUT") == "1", "disable interactive prompts (MCPMESH_NO_INPUT=1)")
 	root.AddGroup(&cobra.Group{ID: "setup", Title: "Setup:"}, &cobra.Group{ID: "node", Title: "Node:"}, &cobra.Group{ID: "mcps", Title: "MCPs:"})
 	root.AddCommand(wrapCmd())
@@ -295,7 +290,7 @@ func rootCmd() *cobra.Command {
 // newer release, for --version.
 func latestNote() string {
 	file, err := paths.UpdateFile()
-	if err != nil || update.DisabledByEnv() {
+	if err != nil {
 		return ""
 	}
 	cached, _ := update.FileCache{Path: file}.Load(context.Background())

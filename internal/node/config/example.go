@@ -15,7 +15,6 @@ hub:
 # node:
 #   name: work-pc
 log_level: info # debug | info | warn | error
-# update_check: false # don't ask GitHub whether a newer release is out
 
 mcps:
   # Add MCPs with "mcp-mesh-node add", the dashboard ("mcp-mesh-node"), or

@@ -204,9 +204,8 @@ Each MCP has either `command` (launch) or `url` (connect):
 | `allow_tools` | the only tools the hub may see and call; omit for all |
 | `disabled` | keep the entry without serving it |
 
-At the top level, `update_check: false` turns off the check for newer
-releases ([Updates](#updates)); `log_level` is `debug`, `info` (default),
-`warn` or `error`.
+At the top level, `log_level` is `debug`, `info` (default), `warn` or
+`error`.
 
 Values can use `${env:NAME}`. The node refuses to send its key over `ws://`
 to a host that isn't local (loopback, private or Tailscale addresses,
@@ -265,9 +264,9 @@ mcp-mesh-node`, or the download for this machine).
 A hub that no longer accepts this node's protocol turns it away, and the
 node stops with a message that says to upgrade.
 
-To turn the check off, set `update_check: false` in `node.yaml`, or
-`MCPMESH_NO_UPDATE_CHECK=1` in the environment (`--no-update-check` sets it
-for one command, and for a node that `start` launches).
+A node that can't reach GitHub (offline, or GitHub is down) tries again
+an hour later and logs the failure only at debug level; nothing else
+changes.
 
 ## Platforms
 
