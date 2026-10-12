@@ -69,6 +69,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    # The release environment holds HOMEBREW_TAP_DEPLOY_KEY and only v* tags
+    # may use it, so a workflow on any other ref can't read the key.
+    environment: release
     permissions:
       contents: write
     steps:
@@ -125,8 +128,8 @@ jobs:
               --title "mcp-mesh ${TAG#v}" --notes "$(cat notes.md)" --generate-notes "${flags[@]}"
           fi
       # A stable release updates the Homebrew formula in <owner>/homebrew-tap.
-      # HOMEBREW_TAP_DEPLOY_KEY is the private half of a deploy key with write
-      # access to that repository only.
+      # HOMEBREW_TAP_DEPLOY_KEY (a release environment secret) is the private
+      # half of a deploy key with write access to that repository only.
       - name: Homebrew formula
         if: ${{ !contains(github.ref_name, '-') }}
         env:
