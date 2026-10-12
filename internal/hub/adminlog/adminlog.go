@@ -32,6 +32,8 @@ const (
 	ToolOverride   = "tool.override"   // target: node/mcp/tool; detail: alias ("" if none or cleared)
 	OAuthAuthorize = "oauth.authorize" // target: key ID; detail: client name
 	OAuthDenied    = "oauth.denied"    // target: client name
+	PairingApprove = "pairing.approve" // target: key ID; detail: "node workstation from 192.168.1.20"
+	PairingDeny    = "pairing.deny"    // target: node name asked for; detail: its address
 )
 
 // Entry is one logged action.

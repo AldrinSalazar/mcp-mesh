@@ -2,7 +2,7 @@
 // token to state-changing requests and turns error bodies into ApiError.
 import type {
   Admin, AdminLogEntry, ApprovalRef, AuditPage, AuditQuery, Call, CreatedKey, Grant, Group, Info, Key, KeyKind, Node,
-  PendingTool, Prompt, ResourceItem, Session, Settings, Stats, Tool, ToolOverride, TrustLevel,
+  PairingRequest, PendingTool, Prompt, ResourceItem, Session, Settings, Stats, Tool, ToolOverride, TrustLevel,
 } from './types'
 
 const base = '/api/v1'
@@ -134,6 +134,14 @@ export const api = {
   // (an empty list approves only the node) stay pending.
   approveNode: (node: string, tools: Omit<ApprovalRef, 'node'>[]) =>
     request<Node['trust']>('POST', `/nodes/${encodeURIComponent(node)}/approve`, { tools }),
+
+  pairings: () => request<PairingRequest[]>('GET', '/pairings'),
+  // approvePairing creates a node key and hands it to the waiting machine.
+  // name: another name than it asked for; replace: revoke the node key bound
+  // to that name (409 without it). 410 when the machine left meanwhile.
+  approvePairing: (id: string, opts: { name?: string; replace?: boolean } = {}) =>
+    request<{ key: Key }>('POST', `/pairings/${encodeURIComponent(id)}/approve`, opts),
+  denyPairing: (id: string) => request<void>('DELETE', `/pairings/${encodeURIComponent(id)}`),
 
   settings: () => request<Settings>('GET', '/settings'),
   setTrustDefault: (level: TrustLevel) => request<Settings>('PUT', '/settings', { trust_default: level }),

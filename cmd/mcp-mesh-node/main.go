@@ -33,7 +33,7 @@ func rootCmd() *cobra.Command {
 	defaultConfig, configErr := paths.ConfigFile()
 	defaultSocket, socketErr := paths.SocketPath()
 	root := &cobra.Command{Use: "mcp-mesh-node", Short: "Manage MCP servers connected to an mcp-mesh hub", Version: version, SilenceUsage: true, Args: cobra.NoArgs,
-		Long:    "Manage this machine’s MCP servers through one hub connection.\n\nGetting started:\n  mcp-mesh-node                      open the dashboard (does everything below)\n  mcp-mesh-node init --hub ws://HUB:7001/node\n  mcp-mesh-node add -- npx -y @modelcontextprotocol/server-filesystem ~/code\n  mcp-mesh-node add --name blender --url http://127.0.0.1:9876/mcp\n                                     connect to an app’s MCP and share it through the hub\n  mcp-mesh-node start                start the node now, until logout\n  mcp-mesh-node install              start it now and at every login",
+		Long:    "Manage this machine’s MCP servers through one hub connection.\n\nGetting started:\n  mcp-mesh-node                      open the dashboard (does everything below)\n  mcp-mesh-node init --hub ws://HUB:7001/node\n  mcp-mesh-node add -- npx -y @modelcontextprotocol/server-filesystem ~/code\n  mcp-mesh-node add --name blender --url http://127.0.0.1:9876/mcp\n                                     connect to an app’s MCP and share it through the hub\n  mcp-mesh-node start                start the node now, until logout;\n                                     without a key it asks the hub to pair\n  mcp-mesh-node install              start it now and at every login",
 		Example: "  mcp-mesh-node",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if interactive(cmd) {
@@ -123,13 +123,15 @@ func rootCmd() *cobra.Command {
 			if err := setKey(cmd, node, initKey); err != nil {
 				return fmt.Errorf("%s was written, but saving the key failed: %w", configPath, err)
 			}
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "No key given: when the node starts it asks the hub to pair, and an admin approves it in the hub's dashboard (Approvals).")
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Run `mcp-mesh-node` to open the dashboard, or `mcp-mesh-node add` then `mcp-mesh-node start`. Validate with `mcp-mesh-node config check`.")
 		return nil
 	})
-	initCmd.Flags().StringVar(&initKey, "key", "", "node key created on the hub (`-` reads it from stdin)")
+	initCmd.Flags().StringVar(&initKey, "key", "", "node key created on the hub (`-` reads it from stdin); without one the node asks the hub to pair")
 	initCmd.Flags().StringVar(&hub, "hub", "", "hub node endpoint")
-	initCmd.Flags().StringVar(&initName, "name", "", "this machine's name in the mesh (default: the hostname); must match the name the node key was created for")
+	initCmd.Flags().StringVar(&initName, "name", "", "this machine's name in the mesh (default: the hostname); must match the name the node key was created for, or is the name pairing asks for")
 	initCmd.Flags().BoolVar(&force, "force", false, "overwrite an existing config")
 	configCmd := &cobra.Command{Use: "config", Short: "Inspect node configuration", Args: cobra.NoArgs}
 	configCmd.AddCommand(&cobra.Command{Use: "check", Short: "Validate the configuration", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
@@ -241,6 +243,7 @@ func rootCmd() *cobra.Command {
 			}
 		}
 		fmt.Fprintf(out, "Logs: %s\n", node.LogsHint())
+		reportPairing(cmd, node, node.Inspect(cmd.Context()))
 		return nil
 	})
 	installCmd.Flags().BoolVar(&atBoot, "at-boot", false, "start when the machine boots, without a login (Linux: loginctl enable-linger)")

@@ -45,6 +45,9 @@ it control over what each agent may do.
 
 - **Self-hosted.** The hub is one container with one SQLite file. Tool
   calls, keys and logs stay on your infrastructure.
+- **Machines join on approval.** A new machine asks to join with a code
+  on its screen; an admin checks the code and approves it. Its key is
+  created for it and never copied around.
 - **No open ports on workstations.** Nodes connect out to the hub; the
   machines that run MCP servers accept no connections.
 - **Least privilege.** Each client key sees only what its groups grant: a
@@ -150,12 +153,35 @@ Or download it from the
 [latest release](https://github.com/AldrinSalazar/mcp-mesh/releases/latest)
 (Linux and macOS; Windows is a preview).
 
-In the dashboard's Keys, create a node key named after the machine. The
-dashboard shows a one-line setup command; run it on that machine:
+Point it at the hub and start it. There is no key to create or copy:
 
 ```sh
-mcp-mesh-node init --hub ws://<hub>:7001/node --name <machine> --key <node-key>
+mcp-mesh-node init --hub ws://<hub>:7001/node
+mcp-mesh-node start
 ```
+
+```
+Started the node in the background until logout (log: …)
+No hub key, so the node asked the hub to pair: approve this machine in the hub's dashboard (Approvals); check it shows code K7Q-4MX
+```
+
+The machine now waits in the dashboard's **Approvals**, under *Machines
+asking to join*. Click **Review**, check that it shows the same code, keep
+or change its name (the default is its host name), and approve. The hub
+sends the node a key bound to that name; the node saves it and connects.
+
+<p align="center">
+  <img src="docs/images/dashboard-pairing.png" alt="Approving a pairing request in the dashboard: render-box asks to join, showing code K7Q-4MX, its host name, system and address, and the name it will have in the mesh" width="480">
+</p>
+
+The code is how you know you are approving the machine in front of you.
+Running `mcp-mesh-node` at a terminal does all of this from its dashboard,
+including finding the hub on your network.
+
+Setting up machines from a script, with nobody at the dashboard? Create a
+node key in Keys instead; it comes with a one-line setup command.
+
+[More on setting up machines →](docs/node.md#set-up-a-machine)
 
 ### 3. Add your MCP servers
 
@@ -180,7 +206,7 @@ The same works from scripts:
 ```sh
 mcp-mesh-node add -- npx -y @modelcontextprotocol/server-filesystem ~/code
 mcp-mesh-node add --name blender --url http://127.0.0.1:9876/mcp
-mcp-mesh-node start
+mcp-mesh-node reload        # apply them to the running node
 ```
 
 [Node configuration →](docs/node.md)

@@ -40,26 +40,79 @@ binary downloaded with a browser is quarantined; clear that with
 
 ## Set up a machine
 
-In the dashboard (Keys → Create key → Node key) or with the hub's
-[`key create node <machine>`](hub.md#keys-and-admins), create a key named
-after the machine. It shows a one-line setup command; run it on that machine:
+A new machine joins the mesh by pairing: it asks the hub to join, and an
+admin approves it in the hub's dashboard. Nobody creates, copies or pastes
+a key.
+
+1. **Point the node at the hub and start it.**
+
+   ```sh
+   mcp-mesh-node init --hub ws://<hub>:7001/node
+   mcp-mesh-node start
+   ```
+
+   `init` writes `~/.config/mcp-mesh/node.yaml` pointing at the hub (at a
+   terminal, without `--hub`, it lists the hubs it finds on your network).
+   The machine's name in the mesh defaults to its host name; `--name`
+   proposes another. The node has no key yet, so once started it asks the
+   hub to pair, and `start` prints the code the request shows:
+
+   ```
+   No hub key, so the node asked the hub to pair: approve this machine in the hub's dashboard (Approvals); check it shows code K7Q-4MX
+   ```
+
+   `mcp-mesh-node status` shows the code too, as *waiting for approval*.
+
+2. **Approve it in the hub's dashboard.** Under Approvals, *Machines asking
+   to join* lists the request with the machine's name, host name, system,
+   address and code; the Overview lists it under *Needs attention*. Click
+   **Review**, check that the code matches the one on the machine, and
+   approve. You can give it another name here; its tools are named after
+   it (`<name>__<mcp>__<tool>`).
+
+3. **Done.** The hub creates a node key bound to that name and sends it to
+   the waiting node, which saves it in a file only you can read
+   (`node.key`, next to `node.yaml`), writes the name to `node.yaml`, and
+   connects. From then on it uses that key, through restarts too; it never
+   pairs again unless the key is removed (`key clear`).
+
+Then [add MCPs](#launch-or-connect). Running `mcp-mesh-node` alone opens an
+interactive dashboard that does all of this too: create the config, pick a
+hub found on the network, start the node (its Hub card shows the code while
+the request waits), add MCPs, show logs and tools.
+
+The code is what makes approving safe: anyone who can reach the hub's node
+port can ask to join, under any name, but only the machine you set up shows
+the code you see in the dashboard. Don't approve a request whose code you
+haven't checked.
+
+### When pairing doesn't go through
+
+| What you see | Why, and what to do |
+| --- | --- |
+| *pairing declined* | An admin declined the request. The node doesn't ask again until it restarts: `mcp-mesh-node stop && mcp-mesh-node start`. |
+| *Name in use* on the request | A node key is already bound to that name, perhaps for this same machine before a reinstall. Approving replaces that key, which disconnects the node using it, or give this machine another name. |
+| *pairing is turned off on this hub* | The hub runs with `--pairing=false`. Use a [key made on the hub](#with-a-key-made-on-the-hub). |
+| *the hub doesn't accept pairing requests* | The hub is older than pairing. Update it, or use a key made on the hub. |
+| *ws:// would send the node key unencrypted* | The hub isn't on a local network and its URL is `ws://`. Use its `wss://` URL, or set `hub.allow_insecure: true` if the path is private. |
+| *too many machines are waiting for approval*, or *too many pairing requests from this address* | The hub holds at most 20 requests at once, 3 per address. Approve or decline the ones waiting; the node keeps asking. |
+| The request disappeared | The node stopped or lost its connection. It asks again, with a new code, when it reconnects. |
+
+### With a key made on the hub
+
+To set up a machine with nobody at the dashboard (from a script, say),
+create a key named after it instead, in the dashboard (Keys → Create key →
+Node key) or with the hub's
+[`key create node <machine>`](hub.md#keys-and-admins). It shows a one-line
+setup command; run it on that machine:
 
 ```sh
 mcp-mesh-node init --hub ws://<hub>:7001/node --name <machine> --key <node-key>
 ```
 
-It writes `~/.config/mcp-mesh/node.yaml` pointing at the hub, names the
-machine (a node key only works for the name it was created for) and saves
-the key in a file only you can read. Then add MCPs and start the node:
-
-```sh
-mcp-mesh-node add -- npx -y @modelcontextprotocol/server-filesystem ~/code
-mcp-mesh-node start
-```
-
-Running `mcp-mesh-node` alone opens an interactive dashboard that does all
-of this: create the config, pick a hub found on the network, add MCPs,
-start and stop the node, show logs and tools.
+A node key only works for the name it was created for, so `--name` names
+the machine to match. `mcp-mesh-node key set` replaces the key on a
+machine that is already set up.
 
 ## Launch or connect
 
@@ -148,8 +201,9 @@ Each MCP has either `command` (launch) or `url` (connect):
 
 Values can use `${env:NAME}`. The node refuses to send its key over `ws://`
 to a host that isn't local (loopback, private or Tailscale addresses,
-`.local`/`.lan` names); use `wss://`, or set `hub.allow_insecure: true` if
-you know the path is private.
+`.local`/`.lan` names), and for the same reason won't pair over it; use
+`wss://`, or set `hub.allow_insecure: true` if you know the path is
+private.
 
 ## Commands
 

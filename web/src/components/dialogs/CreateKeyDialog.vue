@@ -13,7 +13,7 @@ import UiSelect from '@/components/ui/UiSelect.vue'
 import CopyField from '@/components/ui/CopyField.vue'
 import { ApiError, api } from '@/lib/api'
 import { live, refresh } from '@/lib/live'
-import { display, snippet, snippetOptions, type SnippetId } from '@/lib/snippets'
+import { display, pairCommand, snippet, snippetOptions, type SnippetId } from '@/lib/snippets'
 import type { ClientSetup, CreatedKey, KeyKind, NodeSetup, TrustLevel } from '@/lib/types'
 import GroupPicker from '@/components/groups/GroupPicker.vue'
 import { trustLabel, trustLevels } from '@/lib/trust'
@@ -119,6 +119,10 @@ const snippetTitle = computed(() => snippetOptions.find((o) => o.value === which
           <span class="type-text">{{ t.text }}</span>
         </button>
       </div>
+      <UiNotice v-if="isNode && live.settings?.pairing" tone="info" class="pair" title="A machine doesn't need a key made here">
+        Run this on it instead, and approve it under Approvals when it asks to join:
+        <CopyField :value="pairCommand(live.info?.node_url ?? '')" label="Copy setup command" class="pair-cmd" multiline />
+      </UiNotice>
       <UiField
         :label="isNode ? 'Machine name' : 'Client name'"
         for="key-name"
@@ -236,6 +240,9 @@ const snippetTitle = computed(() => snippetOptions.find((o) => o.value === which
 </template>
 
 <style scoped>
+.pair { margin: -4px 0 26px; }
+.pair-cmd { margin-top: 10px; }
+.pair :deep(.content) { min-width: 0; flex: 1; }
 .lbl { font-size: 14px; font-weight: 500; margin: 20px 0 10px; }
 .types { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 26px; }
 .type {

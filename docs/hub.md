@@ -43,6 +43,7 @@ Sign in to the dashboard at `http://<hub>:7000`.
 | --- | --- | --- | --- |
 | 7000 | `/`, `/api/v1` | admins in a browser, scripts | username and password (session cookie) |
 | 7001 | `/node` | nodes (WebSocket) | node key, bound to one node name |
+| 7001 | `/node/pair` | nodes without a key, asking to join (WebSocket) | none; an admin approves each request |
 | 7002 | `/mcp` | MCP clients (Streamable HTTP) | client key, or an OAuth token |
 
 `/healthz` (liveness) and `/readyz` (readiness) on port 7000 need no
@@ -72,6 +73,25 @@ A key's secret is shown once; the hub stores only its hash. Revoking a key
 closes the connections that used it at once and cancels their calls in
 progress. The command line shares the running hub's database, which picks
 changes up within a second.
+
+### Pairing
+
+A node started without a key asks the hub for one on `/node/pair`. The
+request shows in the dashboard's Approvals with the machine's name, host
+name, address and a code such as `K7Q-4MX`; the node shows the same code.
+Check that they match, so you approve the machine in front of you and not
+another one asking at the same time, then approve it, under its name or
+another. The hub creates a node key bound to that name and sends it down
+the waiting connection; the node saves it and connects. If a node key for
+that name exists already, approving replaces it: the old key is revoked
+and its node disconnected. Declining tells the node, which stops asking
+until it restarts.
+
+Requests live in memory, only as long as the node stays connected: at most
+20 wait at once, 3 from one address. Approvals and declines go to the admin
+log. `--pairing=false` (`MCPMESH_PAIRING=false`) turns pairing off; nodes
+then need a key made under Keys. With `--auth=false` there are no keys and
+nothing to pair.
 
 ## Who can use what
 
@@ -139,6 +159,7 @@ Every flag also reads an environment variable.
 | `--trusted-proxies` | `MCPMESH_TRUSTED_PROXIES` | | proxies whose forwarding headers are believed |
 | `--allow-insecure` | `MCPMESH_ALLOW_INSECURE` | `false` | accept plain HTTP from public addresses |
 | `--auth` | `MCPMESH_AUTH` | `true` | `false` lets anyone who reaches the hub use it (local testing) |
+| `--pairing` | `MCPMESH_PAIRING` | `true` | let nodes without a key ask to join; an admin approves each ([Pairing](#pairing)) |
 | `--admin-user`, `--admin-password` | `MCPMESH_ADMIN_USER`, `MCPMESH_ADMIN_PASSWORD` (`_FILE`) | `admin`, generated | the first admin, first start only |
 | `--call-timeout` | `MCPMESH_CALL_TIMEOUT` | `2m` | longest tool call (MCPs can set their own) |
 | `--mdns`, `--name` | `MCPMESH_MDNS`, `MCPMESH_NAME` | `true`, hostname | LAN announcement |

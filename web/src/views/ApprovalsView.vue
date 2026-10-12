@@ -1,12 +1,14 @@
 <script setup lang="ts">
-// Approvals: tools (and whole nodes) held back by a node's trust level until
-// an admin approves them. Changed tools show what changed.
+// Approvals: machines asking to join, and tools (and whole nodes) held back
+// by a node's trust level until an admin approves them. Changed tools show
+// what changed.
 import { computed, ref } from 'vue'
 import { ShieldCheck } from 'lucide-vue-next'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import NodeApprovals from '@/components/approvals/NodeApprovals.vue'
+import PairingRequests from '@/components/approvals/PairingRequests.vue'
 import { groupApprovals, type NodeGroup } from '@/components/approvals/group'
 import { mcpRefs, nodeRefs, refOf, reportApproveError } from '@/components/approvals/approve'
 import type { PendingTool } from '@/lib/types'
@@ -50,13 +52,15 @@ const approveTool = (t: PendingTool) => run(`tool/${t.name}`, () => api.approve(
     <RouterLink to="/nodes" class="arrow-link">Trust levels are set per node</RouterLink>
   </p>
 
+  <PairingRequests v-if="live.pairings.length" :requests="live.pairings" :now="now" class="pairings" />
+
   <div v-if="!live.loaded.approvals" class="panel"><SkeletonRows :rows="4" /></div>
   <EmptyState
-    v-else-if="!groups.length"
+    v-else-if="!groups.length && !live.pairings.length"
     framed
     :icon="ShieldCheck"
     title="Nothing to approve"
-    text="New and changed tools appear here when a node's trust level asks for approval."
+    :text="`New and changed tools appear here when a node's trust level asks for approval${live.settings?.pairing ? ', and machines started without a key ask to join here' : ''}.`"
   >
     <RouterLink to="/nodes" class="arrow-link go">View nodes</RouterLink>
   </EmptyState>
@@ -79,5 +83,6 @@ const approveTool = (t: PendingTool) => run(`tool/${t.name}`, () => api.approve(
 .levels { font-size: 12px; line-height: 1.6; margin: -8px 0 24px; max-width: 760px; }
 .levels .arrow-link { margin-left: 6px; white-space: nowrap; }
 .list { display: flex; flex-direction: column; gap: 16px; }
+.pairings { margin-bottom: 16px; }
 .go { display: inline-block; margin-top: 36px; }
 </style>

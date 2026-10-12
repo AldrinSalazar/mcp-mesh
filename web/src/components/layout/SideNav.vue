@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { Sun, Moon } from 'lucide-vue-next'
 import BrandMark from './BrandMark.vue'
 import { navItems, plannedItems } from './nav'
-import { live } from '@/lib/live'
+import { live, waitingCount } from '@/lib/live'
 import { theme, toggleTheme } from '@/lib/theme'
 
 defineEmits<{ navigate: [] }>()
@@ -33,7 +33,7 @@ const items = computed(() => navItems.filter((i) => !i.authOnly || !live.authOff
         >
           <component :is="i.icon" :size="22" :stroke-width="1.6" aria-hidden="true" />
           <span>{{ i.label }}</span>
-          <span v-if="i.count === 'approvals' && live.approvals.length" class="count" :aria-label="`${live.approvals.length} waiting`">{{ live.approvals.length }}</span>
+          <span v-if="i.count === 'approvals' && waitingCount()" class="count" :aria-label="`${waitingCount()} waiting`">{{ waitingCount() }}</span>
           <span class="marker" aria-hidden="true" />
         </RouterLink>
       </li>

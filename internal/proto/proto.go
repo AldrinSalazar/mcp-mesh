@@ -22,6 +22,16 @@
 //
 // The hub can only open channels on MCPs the node announced. There is no
 // message that lets the hub choose a command, arguments or environment.
+//
+// A node without a key asks to join on [PairPath] instead, without
+// credentials:
+//
+//	node → hub  pair     the name it asks for, its host name and OS
+//	hub  → node pairing  a code to compare with the one in the dashboard
+//	hub  → node paired   an admin approved: the node key and the node name
+//
+// The connection stays open while the request waits. An admin who declines
+// closes it with [CloseDenied]; a node that disconnects withdraws it.
 package proto
 
 import "encoding/json"
@@ -42,6 +52,10 @@ const Subprotocol = "mcpmesh.v1"
 // NodePath is the hub's WebSocket endpoint for nodes.
 const NodePath = "/node"
 
+// PairPath is the hub's WebSocket endpoint for nodes that have no key yet:
+// NodePath + "/pair".
+const PairPath = NodePath + "/pair"
+
 // DefaultMaxMessageSize bounds a single frame (32 MiB).
 const DefaultMaxMessageSize = 32 << 20
 
@@ -55,6 +69,10 @@ const (
 	TOpened  Type = "opened"
 	TMCP     Type = "mcp"
 	TClose   Type = "close"
+
+	TPair    Type = "pair"
+	TPairing Type = "pairing"
+	TPaired  Type = "paired"
 )
 
 // Envelope is one frame on the node ↔ hub WebSocket. Which fields are set
@@ -78,6 +96,9 @@ type Envelope struct {
 
 	Hello   *Hello   `json:"hello,omitempty"`
 	Welcome *Welcome `json:"welcome,omitempty"`
+	Pair    *Pair    `json:"pair,omitempty"`
+	Pairing *Pairing `json:"pairing,omitempty"`
+	Paired  *Paired  `json:"paired,omitempty"`
 }
 
 // Hello is the first frame a node sends.
@@ -96,6 +117,31 @@ type Welcome struct {
 	Version        int    `json:"version"`
 	NodeID         string `json:"nodeId"`
 	MaxMessageSize int64  `json:"maxMessageSize"`
+}
+
+// Pair is the first frame a node sends on PairPath: it has no key and asks
+// an admin to let it join.
+type Pair struct {
+	Version int `json:"version"`
+	// Node is the name the node asks for; the admin may change it.
+	Node        string `json:"node"`
+	Hostname    string `json:"hostname,omitempty"`
+	NodeVersion string `json:"nodeVersion,omitempty"`
+	OS          string `json:"os,omitempty"`
+}
+
+// Pairing tells the node its request is waiting for an admin.
+type Pairing struct {
+	// Code is shown on the node and next to the request in the dashboard,
+	// so the admin approves the machine in front of them.
+	Code string `json:"code"`
+}
+
+// Paired is the hub's answer once an admin approved: a node key bound to
+// Node, which is the name the node must use from now on.
+type Paired struct {
+	Node string `json:"node"`
+	Key  string `json:"key"`
 }
 
 // Transport is how a node reaches an MCP.
@@ -171,7 +217,9 @@ const (
 	CloseUnsupportedVersion = 4001
 	// CloseInvalidKey: the node's key is missing, unknown, revoked, or bound
 	// to another node name.
-	CloseInvalidKey      = 4003
-	CloseNodeNameTaken   = 4004
+	CloseInvalidKey    = 4003
+	CloseNodeNameTaken = 4004
+	// CloseDenied: an admin declined the node's pairing request.
+	CloseDenied          = 4005
 	CloseMessageTooLarge = 4013
 )

@@ -107,6 +107,32 @@ func WriteKeyFile(path, key string) error {
 	return nil
 }
 
+// DefaultKeyPath is where StoreKey keeps the key: next to node.yaml.
+func DefaultKeyPath(configPath string) string {
+	return filepath.Join(filepath.Dir(configPath), DefaultKeyFile)
+}
+
+// StoreKey saves key in DefaultKeyPath (mode 0600) and points hub.key_file
+// at it, replacing any key_env. If node.yaml rejects the change (say, a
+// ws:// hub on the internet) the previous key file is put back. It returns
+// the key file.
+func StoreKey(configPath, key string) (string, error) {
+	file := DefaultKeyPath(configPath)
+	previous, readErr := os.ReadFile(file)
+	if err := WriteKeyFile(file, key); err != nil {
+		return "", err
+	}
+	if err := SetKeyFile(configPath, file); err != nil {
+		if readErr == nil {
+			_ = WriteKeyFile(file, strings.TrimSpace(string(previous)))
+		} else {
+			_ = os.Remove(file)
+		}
+		return "", err
+	}
+	return file, nil
+}
+
 // SetKeyFile points hub.key_file at keyFile and drops hub.key_env, keeping
 // comments. The file must already exist: the edited config is validated.
 func SetKeyFile(path, keyFile string) error {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { display, snippet, wrapCommand } from './snippets'
+import { display, pairCommand, snippet, wrapCommand } from './snippets'
 
 const i = {
   url: 'https://mesh.local/mcp',
@@ -43,5 +43,14 @@ describe('wrapCommand', () => {
   })
   it('only affects the Claude Code display', () => {
     expect(display('curl', i)).toBe(snippet('curl', i))
+  })
+})
+
+describe('pairCommand', () => {
+  it('points the node at the hub and starts it', () => {
+    expect(pairCommand('ws://hub.lan:7001/node')).toBe('mcp-mesh-node init --hub ws://hub.lan:7001/node && mcp-mesh-node start')
+  })
+  it('quotes a URL the shell would split', () => {
+    expect(pairCommand("wss://hub/a b's")).toBe("mcp-mesh-node init --hub 'wss://hub/a b'\\''s' && mcp-mesh-node start")
   })
 })

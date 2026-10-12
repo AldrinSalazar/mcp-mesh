@@ -69,9 +69,13 @@ func (m *model) cards() []statusCard {
 	if s.Daemon.Running {
 		h := s.Daemon.Status.Hub
 		hub.detail = singleLine(h.URL)
-		if h.Connected {
+		switch {
+		case h.Connected:
 			hub.state = m.green("● connected · " + elapsed(m.now, h.Since))
-		} else {
+		case h.PairCode != "":
+			hub.state = lipgloss.NewStyle().Foreground(m.theme().warn).Render("● waiting for approval")
+			hub.detail = "code " + singleLine(h.PairCode) + " · approve it on the hub"
+		default:
 			hub.state = lipgloss.NewStyle().Foreground(m.theme().warn).Render("● retrying")
 			hub.detail = singleLine(h.LastError)
 			if h.KeyRejected {

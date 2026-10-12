@@ -14,7 +14,7 @@ and credit in the fix's release notes if you want it.
 ## What is in scope
 
 - Getting past the hub's checks: keys, admin sign-in and sessions, CSRF,
-  OAuth, groups and grants, trust levels and approvals.
+  OAuth, groups and grants, trust levels and approvals, node pairing.
 - A hub making a node run something its `node.yaml` doesn't offer, or
   reaching tools `allow_tools` excludes.
 - Secrets leaking: keys, tokens or passwords in logs, the API or the
@@ -29,6 +29,9 @@ and credit in the fix's release notes if you want it.
 - Keep the dashboard's port (7000) private.
 - Give each machine and each client its own key, and revoke keys you no
   longer use.
+- Approve a pairing request only when the machine you set up shows the
+  same code. If the node port is reachable from networks you don't trust
+  and you don't pair machines, start the hub with `--pairing=false`.
 - Use the *Review changes* or *Approve everything* trust level for nodes
   whose MCP servers you don't control: a tool whose description changes is
   then held until you approve it.

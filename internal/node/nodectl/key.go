@@ -28,7 +28,7 @@ type KeyResult struct {
 
 // DefaultKeyFile is where SetKey stores the key: next to node.yaml.
 func (n *Node) DefaultKeyFile() string {
-	return filepath.Join(filepath.Dir(n.opts.ConfigPath), config.DefaultKeyFile)
+	return config.DefaultKeyPath(n.opts.ConfigPath)
 }
 
 // SetKey stores the hub key in the default key file (mode 0600) and points
@@ -43,21 +43,10 @@ func (n *Node) SetKey(ctx context.Context, key string) (KeyResult, error) {
 	if _, err := os.Stat(n.opts.ConfigPath); errors.Is(err, os.ErrNotExist) {
 		return KeyResult{}, fmt.Errorf("%s does not exist; create it first with `mcp-mesh-node init`", n.opts.ConfigPath)
 	}
-	file := n.DefaultKeyFile()
-	previous, readErr := os.ReadFile(file)
-	reloaded, err := n.edit(ctx, func() error {
-		if err := config.WriteKeyFile(file, key); err != nil {
-			return err
-		}
-		if err := config.SetKeyFile(n.opts.ConfigPath, file); err != nil {
-			if readErr == nil {
-				_ = config.WriteKeyFile(file, strings.TrimSpace(string(previous)))
-			} else {
-				_ = os.Remove(file)
-			}
-			return err
-		}
-		return nil
+	var file string
+	reloaded, err := n.edit(ctx, func() (err error) {
+		file, err = config.StoreKey(n.opts.ConfigPath, key)
+		return err
 	})
 	if err != nil {
 		return KeyResult{}, err

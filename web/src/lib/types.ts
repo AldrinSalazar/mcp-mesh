@@ -134,6 +134,24 @@ export interface Group {
 export interface Settings {
   trust_default: TrustLevel
   oauth: { enabled: boolean; issuer?: string; resource?: string }
+  // pairing: machines without a key may ask to join (the hub's --pairing).
+  pairing: boolean
+}
+
+// A machine without a key asking to join. Approving it creates a node key
+// and sends it to the machine, which waits with the same code on screen.
+export interface PairingRequest {
+  id: string
+  node: string // the name it asked for
+  hostname: string
+  os: string
+  node_version: string
+  ip: string
+  code: string
+  requested: string
+  // name_taken: a node key is bound to that name already; approving under
+  // it replaces that key.
+  name_taken: boolean
 }
 
 export interface AdminLogEntry {

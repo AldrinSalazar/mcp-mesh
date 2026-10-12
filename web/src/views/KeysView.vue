@@ -15,6 +15,7 @@ import RevokeKeyDialog from '@/components/keys/RevokeKeyDialog.vue'
 import { openCreateKey } from '@/lib/dialogs'
 import { ago, date, shortID } from '@/lib/format'
 import { live, useNow } from '@/lib/live'
+import { pairCommand } from '@/lib/snippets'
 import { keyConnection } from '@/lib/status'
 import type { Key } from '@/lib/types'
 
@@ -33,6 +34,9 @@ const filters = [
 // Group names of a client key, in the hub's group order.
 const groupNames = (k: Key) => live.groups.filter((g) => (k.groups ?? []).includes(g.id)).map((g) => g.name)
 const conn = (k: Key) => keyConnection(k, live.nodes, now.value)
+
+// A machine set up this way asks the hub to pair when it starts.
+const setupCommand = computed(() => pairCommand(live.info?.node_url ?? ''))
 
 // Node keys first, then clients, each by name.
 const rows = computed(() => {
@@ -126,6 +130,11 @@ const rows = computed(() => {
         <p class="label">MCP URL</p>
         <CopyField :value="live.info?.client_url ?? ''" label="Copy MCP URL" />
       </div>
+    </div>
+    <div v-if="live.settings?.pairing" class="oauth-box">
+      <p class="label">Machines without a key</p>
+      <p class="muted sub2">Set up a machine without creating a key first: it asks to join, and you approve it in Approvals. Run on that machine:</p>
+      <CopyField :value="setupCommand" label="Copy setup command" />
     </div>
     <div v-if="live.info?.oauth" class="oauth-box">
       <p class="label">Apps that support OAuth</p>

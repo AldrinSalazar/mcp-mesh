@@ -79,6 +79,13 @@ type Options struct {
 	OAuthName func(clientID string) string
 	// OAuthIssuer is the authorization server's URL; empty when OAuth is off.
 	OAuthIssuer string
+	// Pairing is nil when the hub doesn't accept pairing requests (auth
+	// off, or turned off): the list is empty and approving answers 404.
+	Pairing Pairing
+	// DisconnectKey closes the nodes connected with a key at once (the
+	// registry's), for a key replaced by a pairing; nil leaves it to the
+	// key watcher.
+	DisconnectKey func(keyID string)
 
 	Version, NodeURL, ClientURL, DiscoveryName string
 
@@ -185,6 +192,12 @@ func (s *Server) route(path string) (route, map[string]string, bool) {
 		return route{methods: m("GET", s.keysList, "POST", s.keysCreate), needsAuth: true}, nil, true
 	case len(seg) == 2 && seg[0] == "keys":
 		return route{methods: m("DELETE", s.keysDelete), needsAuth: true}, map[string]string{"id": seg[1]}, true
+	case len(seg) == 1 && seg[0] == "pairings":
+		return route{methods: m("GET", s.pairingsList), needsAuth: true}, nil, true
+	case len(seg) == 2 && seg[0] == "pairings":
+		return route{methods: m("DELETE", s.pairingDeny), needsAuth: true}, map[string]string{"id": seg[1]}, true
+	case len(seg) == 3 && seg[0] == "pairings" && seg[2] == "approve":
+		return route{methods: m("POST", s.pairingApprove), needsAuth: true}, map[string]string{"id": seg[1]}, true
 	case len(seg) == 1 && seg[0] == "admins":
 		return route{methods: m("GET", s.adminsList, "POST", s.adminsCreate), needsAuth: true}, nil, true
 	case len(seg) == 2 && seg[0] == "admins":

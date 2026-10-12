@@ -83,3 +83,14 @@ export function wrapCommand(cmd: string): string {
 export function display(id: SnippetId, i: SnippetInput): string {
   return id === 'claude-code' ? wrapCommand(i.claudeCode) : snippet(id, i)
 }
+
+// pairCommand sets a machine up to join through pairing: it points the node
+// at the hub and starts it, and the node asks to join (no key involved).
+export function pairCommand(nodeURL: string): string {
+  return `mcp-mesh-node init --hub ${shellWord(nodeURL)} && mcp-mesh-node start`
+}
+
+// shellWord quotes s for a POSIX shell when it needs it (as the hub does).
+function shellWord(s: string): string {
+  return /^[A-Za-z0-9\-_.:/@%+=,]+$/.test(s) ? s : `'${s.replaceAll("'", `'\\''`)}'`
+}

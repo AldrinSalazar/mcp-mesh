@@ -21,7 +21,7 @@ const loaded = computed(() => live.loaded.nodes)
 const fresh = computed(() => loaded.value && live.nodes.length === 0)
 const m = computed(() => metrics(live.nodes, live.tools))
 const issues = computed(() => problems(live.nodes))
-const waiting = computed(() => approvalItems(live.nodes, live.approvals))
+const waiting = computed(() => approvalItems(live.nodes, live.approvals, live.pairings))
 const calls = computed(() => callsLine(live.stats))
 const recent = computed(() => live.calls.slice(0, 5))
 const offline = computed(() => m.value.total - m.value.online)
@@ -35,7 +35,7 @@ const mcpShort = computed(() => (m.value.groups.waiting ? `${m.value.groups.wait
     <UiButton v-if="!live.authOff && !fresh" class="desktop-btn" variant="primary" :icon="Plus" @click="openCreateKey('node')">Connect something</UiButton>
   </PageHeader>
 
-  <ConnectGuide v-if="fresh" :info="live.info" :auth-off="live.authOff" @key="openCreateKey" />
+  <ConnectGuide v-if="fresh" :info="live.info" :auth-off="live.authOff" :pairing="live.settings?.pairing" :requests="live.pairings" @key="openCreateKey" />
 
   <template v-else>
     <div class="metrics">

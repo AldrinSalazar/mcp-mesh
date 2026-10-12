@@ -1,5 +1,6 @@
 // What an admin does in the dashboard, in a real browser against the mock
-// API: sign in, connect a machine, connect a client, scope a group.
+// API: sign in, connect a machine, let one join, connect a client, scope a
+// group.
 import { expect, test, type Page } from '@playwright/test'
 
 // The mock API keeps one session for everyone; each test starts signed out.
@@ -45,15 +46,51 @@ test('a new machine gets one setup command that names it', async ({ page }) => {
   await dialog.getByLabel('Machine name').fill('render-box')
   await dialog.getByRole('button', { name: /create/i }).click()
   await expect(page.getByText('Set up RENDER-BOX')).toBeVisible()
-  const setup = page.locator('code', { hasText: 'mcp-mesh-node init' })
+  // In the dialog: the Keys page has a pairing command of its own.
+  const setup = dialog.locator('code', { hasText: 'mcp-mesh-node init' })
   await expect(setup).toContainText('--name render-box')
   await expect(setup).toContainText('--hub ')
   await expect(setup).toContainText('--key mm_node_')
-  await expect(page.locator('code', { hasText: 'mcp-mesh-node key set' })).toBeVisible()
+  await expect(dialog.locator('code', { hasText: 'mcp-mesh-node key set' })).toBeVisible()
   await page.getByRole('button', { name: 'I’ve saved the key' }).click()
   await expect(page.getByText('render-box')).toBeVisible()
   // The secret was shown once: it isn't on the page any more.
   await expect(page.locator('code', { hasText: 'mm_node_' })).toHaveCount(0)
+})
+
+test('a machine that asks to join is approved under another name', async ({ page }) => {
+  await signIn(page)
+  await expect(page.getByText('render-box asks to join')).toBeVisible()
+  await page.goto('/approvals')
+  const requests = page.getByRole('region', { name: 'Machines asking to join' })
+  await expect(requests.getByLabel('Code K7Q-4MX')).toBeVisible()
+  await requests.getByRole('listitem').filter({ hasText: 'render-box' }).getByRole('button', { name: 'Review' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('Pairing code')).toHaveText('K7Q-4MX')
+  await dialog.getByLabel('Name in the mesh').fill('render 01')
+  await expect(dialog.getByText('Use a name without spaces.')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Approve' })).toBeDisabled()
+  await dialog.getByLabel('Name in the mesh').fill('render-01')
+  await dialog.getByRole('button', { name: 'Approve' }).click()
+  await expect(page.getByText('render-01 received its key')).toBeVisible()
+  await expect(requests.getByText('render-box')).toHaveCount(0)
+  await page.goto('/keys')
+  await expect(page.getByRole('row', { name: /render-01/ })).toBeVisible()
+})
+
+test('a request for a name in use replaces its key, or is declined', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/approvals')
+  const row = page.getByRole('region', { name: 'Machines asking to join' }).getByRole('listitem').filter({ hasText: 'laptop' })
+  await expect(row.getByText('Name in use')).toBeVisible()
+  await row.getByRole('button', { name: 'Review' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('A node key for laptop exists')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Replace key and approve' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await row.getByRole('button', { name: 'Decline' }).click()
+  await expect(page.getByText('laptop was told no.')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Machines asking to join' })).toHaveCount(0)
 })
 
 test('a client key comes with the Claude Code command', async ({ page }) => {

@@ -147,6 +147,43 @@ func reportSaved(cmd *cobra.Command, pending bool) {
 	}
 }
 
+// pairingWait bounds how long start and install wait for a node without a
+// key to get its pairing code from the hub.
+var pairingWait = 5 * time.Second
+
+// reportPairing shows the pairing code of a node that was started without
+// a key, so the user can approve it in the hub's dashboard right away.
+func reportPairing(cmd *cobra.Command, node *nodectl.Node, before nodectl.Snapshot) {
+	if before.Config.Key.Set() || before.Config.Hub == "" {
+		return
+	}
+	out := cmd.OutOrStdout()
+	ctx, cancel := context.WithTimeout(cmd.Context(), pairingWait)
+	defer cancel()
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if st, err := node.Client().Status(ctx); err == nil {
+			switch h := st.Hub; {
+			case h.Connected:
+				return
+			case h.PairCode != "":
+				fmt.Fprintf(out, "No hub key, so the node asked the hub to pair: %s\n", pairingHint(h.PairCode))
+				return
+			case h.KeyRejected && h.LastError != "":
+				fmt.Fprintf(out, "No hub key, and pairing failed: %s\n", h.LastError)
+				return
+			}
+		}
+		select {
+		case <-ctx.Done():
+			fmt.Fprintln(out, "No hub key: the node asks the hub to pair once it reaches it; `mcp-mesh-node status` shows the code to approve in the hub's dashboard")
+			return
+		case <-tick.C:
+		}
+	}
+}
+
 func addManagementCommands(root *cobra.Command) {
 	root.AddCommand(&cobra.Command{Use: "start", Short: "Start the node in the background (until logout)", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		node, err := commandNode(cmd)
@@ -165,6 +202,7 @@ func addManagementCommands(root *cobra.Command) {
 		default:
 			fmt.Fprintf(cmd.OutOrStdout(), "Started the node in the background until logout (log: %s)\n", before.LogFile)
 		}
+		reportPairing(cmd, node, before)
 		return nil
 	}})
 	root.AddCommand(&cobra.Command{Use: "stop", Short: "Stop the node", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {

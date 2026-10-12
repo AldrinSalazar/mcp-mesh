@@ -84,6 +84,7 @@ func rootCmd() *cobra.Command {
 	f.StringVar(&cfg.AdminPassword, "admin-password", env("MCPMESH_ADMIN_PASSWORD", ""), "password of the first admin user (default: generated and logged once); prefer MCPMESH_ADMIN_PASSWORD or MCPMESH_ADMIN_PASSWORD_FILE, as flags show in the process list")
 	f.StringVar(&cfg.trustedProxies, "trusted-proxies", env("MCPMESH_TRUSTED_PROXIES", ""), "comma-separated addresses or CIDR prefixes of reverse proxies whose X-Forwarded-For and X-Forwarded-Proto are trusted")
 	f.BoolVar(&cfg.AllowInsecure, "allow-insecure", envBool("MCPMESH_ALLOW_INSECURE", false), "accept plain HTTP from public addresses (by default only loopback and private networks may use it)")
+	f.BoolVar(&cfg.Pairing, "pairing", envBool("MCPMESH_PAIRING", true), "let a node without a key ask to join; an admin approves it in the dashboard")
 	f.BoolVar(&cfg.MDNS, "mdns", envBool("MCPMESH_MDNS", true), "announce the hub on the local network")
 	f.StringVar(&cfg.Name, "name", env("MCPMESH_NAME", hostname), "hub name shown to nodes")
 	f.DurationVar(&cfg.CallTimeout, "call-timeout", envDuration("MCPMESH_CALL_TIMEOUT", 120*time.Second), "default tool call timeout")
